@@ -1,116 +1,61 @@
-import React, { useState, useEffect } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import EvaluatorView from './components/EvaluatorView';
-import ABSCalculator from './components/ABSCalculator';
-import { supabase } from './lib/supabase';
+import { useState } from 'react'
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom'
+import { translations } from './translations'
+import { AuthProvider } from './context/AuthContext'
+import UtilityBar from './components/UtilityBar'
+import Header from './components/Header'
+import Footer from './components/Footer'
+import ScrollToTop from './components/ScrollToTop'
+import ProtectedRoute from './components/ProtectedRoute'
 
-function MainLayout() {
-  const { user } = useAuth();
-  const [mainView, setMainView] = useState('evaluator');
-  const [language, setLanguage] = useState('en');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  
-  const [chats, setChats] = useState([]);
-  const [activeChatId, setActiveChatId] = useState(null);
+import HomePage         from './pages/HomePage'
+import AboutPage        from './pages/AboutPage'
+import HowItWorksPage   from './pages/HowItWorksPage'
+import CapabilitiesPage from './pages/CapabilitiesPage'
+import EvidencePage     from './pages/EvidencePage'
+import ResourcesPage    from './pages/ResourcesPage'
+import Dashboard        from './pages/Dashboard'
+import AuthPage         from './pages/AuthPage'
 
-  // Fetch user chats from Supabase
-  const loadUserChats = async () => {
-    if (!user) {
-      setChats([]);
-      setActiveChatId(null);
-      return;
-    }
-    const { data } = await supabase
-      .from('chats')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('is_pinned', { ascending: false })
-      .order('created_at', { ascending: false });
-
-    if (data) {
-      setChats(data);
-      if (data.length > 0 && !activeChatId) {
-        setActiveChatId(data[0].id);
-      }
-    }
-  };
-
-  useEffect(() => {
-    loadUserChats();
-  }, [user]);
-
-  const handleNewChat = () => {
-    setActiveChatId(null);
-    setMainView('evaluator');
-  };
-
-  const handleUpdateTitle = async (chatId, title) => {
-    setChats(prev => prev.map(c => c.id === chatId ? { ...c, title } : c));
-    await supabase.from('chats').update({ title }).eq('id', chatId);
-  };
-
-  const handleTogglePin = async (chatId, is_pinned) => {
-    setChats(prev => prev.map(c => c.id === chatId ? { ...c, is_pinned } : c));
-    await supabase.from('chats').update({ is_pinned }).eq('id', chatId);
-  };
-
-  const handleDeleteChat = async (chatId) => {
-    setChats(prev => prev.filter(c => c.id !== chatId));
-    if (activeChatId === chatId) {
-      setActiveChatId(null);
-    }
-    await supabase.from('chats').delete().eq('id', chatId);
-  };
-
+function LandingLayout({ t, lang, setLang }) {
   return (
-    <div className="flex h-screen bg-neutral-100 text-neutral-900 overflow-hidden font-sans">
-      <Sidebar
-        isOpen={isSidebarOpen}
-        setIsOpen={setIsSidebarOpen}
-        chats={chats}
-        activeChatId={activeChatId}
-        onSelectChat={(id) => { setActiveChatId(id); setMainView('evaluator'); }}
-        onNewChat={handleNewChat}
-        onUpdateTitle={handleUpdateTitle}
-        onTogglePin={handleTogglePin}
-        onDeleteChat={handleDeleteChat}
-      />
-
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-        <Navbar
-          mainView={mainView}
-          setMainView={setMainView}
-          language={language}
-          setLanguage={setLanguage}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-        />
-
-        <main className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col items-center justify-center">
-          {mainView === 'evaluator' ? (
-            <EvaluatorView
-              language={language}
-              activeChatId={activeChatId}
-              onFirstMessageSent={(newChat) => {
-                setChats(prev => [newChat, ...prev]);
-                setActiveChatId(newChat.id);
-              }}
-            />
-          ) : (
-            <ABSCalculator />
-          )}
-        </main>
-      </div>
+    <div className="min-h-screen bg-white text-navy-900 font-sans flex flex-col">
+      <UtilityBar t={t} lang={lang} setLang={setLang} />
+      <Header t={t} lang={lang} setLang={setLang} />
+      <main className="flex-grow">
+        <Outlet />
+      </main>
+      <Footer t={t} />
     </div>
-  );
+  )
 }
 
 export default function App() {
+  const [lang, setLang] = useState('en')
+  const t = translations[lang] || translations.en
+
   return (
-    <AuthProvider>
-      <MainLayout />
-    </AuthProvider>
-  );
+    <BrowserRouter>
+      <AuthProvider>
+        <ScrollToTop />
+        <Routes>
+          <Route element={<LandingLayout t={t} lang={lang} setLang={setLang} />}>
+            <Route path="/"             element={<HomePage         t={t} />} />
+            <Route path="/about"        element={<AboutPage        t={t} />} />
+            <Route path="/how-it-works" element={<HowItWorksPage   t={t} />} />
+            <Route path="/capabilities" element={<CapabilitiesPage t={t} />} />
+            <Route path="/evidence"     element={<EvidencePage     t={t} />} />
+            <Route path="/resources"    element={<ResourcesPage    t={t} />} />
+            <Route path="/auth"         element={<AuthPage />} />
+          </Route>
+          
+          <Route path="/evaluate" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+        </Routes>
+      </AuthProvider>
+    </BrowserRouter>
+  )
 }
