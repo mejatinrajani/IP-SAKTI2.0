@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square } from 'lucide-react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -13,7 +13,12 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
   const [messages, setMessages] = useState([]);
   const [activeReport, setActiveReport] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
+  const [jurisdiction, setJurisdiction] = useState('national');
   const chatEndRef = useRef(null);
+
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const recognitionRef = useRef(null);
 
   // Load chat messages from Supabase whenever activeChatId changes
   useEffect(() => {
@@ -57,6 +62,63 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
     if (user && activeChatId && messageId !== 'welcome') {
       await supabase.from('messages').update({ feedback: feedbackType }).eq('id', messageId);
     }
+  };
+
+  // Initialize Speech-to-Text (Microphone)
+  useEffect(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognition) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
+      recognitionRef.current.lang = language === 'hi' ? 'hi-IN' : 'en-IN'; // Support Hindi/English
+
+      recognitionRef.current.onresult = (event) => {
+        const transcript = Array.from(event.results)
+          .map(result => result[0])
+          .map(result => result.transcript)
+          .join('');
+        setQuery(transcript);
+      };
+
+      recognitionRef.current.onerror = () => setIsListening(false);
+      recognitionRef.current.onend = () => setIsListening(false);
+    }
+    
+    // Cleanup Text-to-Speech on unmount
+    return () => window.speechSynthesis.cancel();
+  }, [language]);
+
+  const toggleListening = (e) => {
+    e.preventDefault();
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      setQuery(''); // Clear previous text when starting new dictation
+      recognitionRef.current?.start();
+      setIsListening(true);
+    }
+  };
+
+  // Text-to-Speech (Read Aloud)
+  const handleSpeak = (text) => {
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+    // Clean markdown characters so the bot doesn't read "hash hash asterisk"
+    const cleanText = text.replace(/[#*_>\[\]]/g, '');
+    const utterance = new SpeechSynthesisUtterance(cleanText);
+    
+    // Attempt to match an Indian accent/voice if available
+    const voices = window.speechSynthesis.getVoices();
+    const indianVoice = voices.find(v => v.lang.includes('IN') || v.lang.includes('hi'));
+    if (indianVoice) utterance.voice = indianVoice;
+    
+    utterance.onend = () => setIsSpeaking(false);
+    window.speechSynthesis.speak(utterance);
+    setIsSpeaking(true);
   };
 
   const handleSend = async (e) => {
@@ -192,6 +254,13 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
               {msg.role === 'ai' && (
                 <div className="flex items-center gap-1 mt-2 text-neutral-400 opacity-80 group-hover:opacity-100 transition-opacity">
                   <button
+                    onClick={() => handleSpeak(msg.report_data ? msg.report_data.final_report.content : msg.text_content)}
+                    className="p-1 hover:text-neutral-700 rounded transition-colors"
+                    title={isSpeaking ? "Stop reading" : "Read aloud"}
+                  >
+                    {isSpeaking ? <Square className="w-3.5 h-3.5 text-red-600" /> : <Volume2 className="w-3.5 h-3.5" />}
+                  </button>
+                  <button
                     onClick={() => handleCopy(msg.id, msg.text_content)}
                     className="p-1 hover:text-neutral-700 rounded transition-colors"
                     title="Copy text"
@@ -241,6 +310,16 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
             className="flex-1 bg-transparent px-2 py-2 text-sm text-neutral-800 outline-none placeholder-neutral-400"
           />
           <button
+            type="button"
+            onClick={toggleListening}
+            className={`p-2 rounded-xl transition-all mr-1 ${
+              isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-neutral-500 hover:bg-neutral-200'
+            }`}
+            title="Dictate prompt"
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+          <button
             type="submit"
             disabled={isLoading || !query.trim()}
             className="p-2 bg-neutral-900 text-white rounded-xl hover:bg-neutral-800 disabled:opacity-20 transition-all ml-1"
@@ -255,11 +334,33 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
         <div className="absolute inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/20 backdrop-blur-xs" onClick={() => setActiveReport(null)} />
           <div className="relative w-full md:w-3/4 bg-white h-full shadow-2xl flex flex-col border-l border-neutral-200 animate-slide-in-right">
+            
             <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
               <div>
                 <h3 className="text-base font-bold text-neutral-900">Statutory Dossier Canvas</h3>
                 <p className="text-xs text-neutral-500">Ministry of Ayush Regulatory Synthesis</p>
               </div>
+              
+              {/* Jurisdiction Toggle */}
+              <div className="flex bg-neutral-200/70 p-1 rounded-xl mx-4">
+                <button
+                  onClick={() => setJurisdiction('national')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    jurisdiction === 'national' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  🇮🇳 National
+                </button>
+                <button
+                  onClick={() => setJurisdiction('international')}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                    jurisdiction === 'international' ? 'bg-white text-indigo-700 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  🌐 International
+                </button>
+              </div>
+
               <button 
                 onClick={() => setActiveReport(null)}
                 className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-colors text-sm font-semibold"
@@ -267,8 +368,70 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                 ✕
               </button>
             </div>
+            
             <div className="p-6 overflow-y-auto flex-1">
-              <MarkdownRenderer content={activeReport.final_report?.content} />
+              <MarkdownRenderer 
+                content={
+                  jurisdiction === 'national' 
+                    ? (activeReport.final_report?.national_content || activeReport.final_report?.content) 
+                    : (activeReport.final_report?.international_content || 'No international dossier generated for this query.')
+                } 
+              />
+              {/* DYNAMIC AI Audit & Provenance Footer */}
+              {activeReport.audit_metrics && (
+                <div className="mt-8 pt-4 border-t border-neutral-200 bg-neutral-50 rounded-xl p-4">
+                  <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-3">
+                    AI Audit & Traceability Report
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {/* Groundedness Metric */}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-neutral-500 uppercase">Statutory Faithfulness</span>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="w-full bg-neutral-200 rounded-full h-1.5">
+                          <div 
+                            className={`h-1.5 rounded-full ${activeReport.audit_metrics.groundedness_score >= 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                            style={{ width: `${activeReport.audit_metrics.groundedness_score}%` }}
+                          ></div>
+                        </div>
+                        <span className={`text-xs font-bold ${activeReport.audit_metrics.groundedness_score >= 90 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          {activeReport.audit_metrics.groundedness_score}%
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-neutral-400 mt-1">Dynamic LLM-as-a-Judge Score</span>
+                    </div>
+
+                    {/* Knowledge Limit / Confidence */}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-neutral-500 uppercase">Data Completeness</span>
+                      <span className={`text-xs font-bold mt-1 flex items-center gap-1 ${
+                        activeReport.audit_metrics.confidence === 'High' ? 'text-emerald-600' : 'text-amber-600'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          activeReport.audit_metrics.confidence === 'High' ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}></span>
+                        {activeReport.audit_metrics.confidence}
+                      </span>
+                      <span className="text-[10px] text-neutral-400 mt-1 line-clamp-1" title={activeReport.audit_metrics.completeness}>
+                        {activeReport.audit_metrics.completeness}
+                      </span>
+                    </div>
+
+                    {/* Provenance / Audit Trail */}
+                    <div className="flex flex-col">
+                      <span className="text-[10px] text-neutral-500 uppercase">Verification Sources</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {activeReport.audit_metrics.sources?.map((source, idx) => (
+                          <span key={idx} className="text-[9px] px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded">
+                            {source}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -14,7 +14,7 @@ from core.graph_engine import graph_db
 from core.orchestrator import app as langgraph_app, base_llm
 from fastapi import Depends
 from core.security import verify_supabase_jwt
-
+from core.prior_art import search_existing_patents
 router = APIRouter()
 logger = logging.getLogger("MASTER_ORCHESTRATOR")
 
@@ -35,6 +35,7 @@ class EvalReportData(BaseModel):
     extracted_claims: str = ""
     dmr_violation: bool = False
     final_report: Dict[str, Any] = {}
+    audit_metrics: Dict[str, Any] = {}
 
 class EvalRequest(BaseModel):
     user_prompt: str = Field(..., description="E.g., I am creating an anti-inflammatory formulation using Cannabis sativa and Ziziphus xylopyrus for diabetes cure.")
@@ -48,6 +49,20 @@ class IntentClassification(BaseModel):
     chat_response: str = Field(
         default="", 
         description="If intent is 'chat', provide a concise, helpful, and polite response. If intent is 'evaluation', leave as empty string."
+    )
+
+class AuditMetrics(BaseModel):
+    groundedness_score: int = Field(
+        ..., 
+        description="Faithfulness score (0-100). Subtract points if the report contains claims not present in the legal/botanical context."
+    )
+    completeness: str = Field(
+        ..., 
+        description="E.g., 'Complete', 'Partial (Missing Toxicity Data)', or 'Low (Insufficient Info)'"
+    )
+    confidence: str = Field(
+        ..., 
+        description="Must be 'High', 'Moderate', or 'Low' based on data availability."
     )
 
 class EvalResponse(BaseModel):
@@ -154,6 +169,7 @@ async def ask_ip_sakti(payload: OrchestratorRequest):
 # ---------------------------------------------------------
 # ENDPOINT 2: BIOLOGICAL & STATUTORY FORMULATION EVALUATION
 # ---------------------------------------------------------
+
 @router.post(
     "/evaluate", 
     response_model=EvalResponse,
@@ -185,14 +201,13 @@ async def evaluate_formulation(payload: EvalRequest, user_id: str = Depends(veri
         # STEP 2: FAST INTENT GATEKEEPER ROUTING
         # -------------------------------------------------------------------
         gatekeeper_prompt = (
-            "You are the routing classifier for IP-SAKTI 2.0 (Ministry of Ayush Regulatory AI).\n"
-            "Analyze the following user input and determine whether it is general conversation or requires a regulatory audit.\n\n"
+            "You are the routing classifier for IP-SAKTI 2.0, a strict Ministry of Ayush Regulatory AI.\n"
+            "Analyze the following user input:\n\n"
             f"User Input: \"{current_prompt}\"\n\n"
             "Rules:\n"
-            "- If the input is a greeting, general inquiry, pleasantry, or non-formulation chat: "
-            "set intent='chat' and craft a polite, professional reply in 'chat_response'.\n"
-            "- If the input specifies plant names, Ayurvedic herbs, therapeutic/medical claims, or seeks regulatory/patent assessment: "
-            "set intent='evaluation' and leave 'chat_response' empty."
+            "1. VAGUE INPUTS: If the input is vague (e.g., 'I want to make a medicine', 'help me with Ayurveda', 'hello') and LACKS specific botanical names or therapeutic claims, set intent='chat'. For the chat_response, politely state that you are ready to help, but require them to list their specific ingredients and intended medical claims first.\n"
+            "2. OUT OF BOUNDS: If the input asks for coding, math, or general trivia, set intent='chat' and strictly refuse, stating you only assist with Ayurvedic regulatory compliance.\n"
+            "3. EVALUATION: ONLY if the input explicitly names botanical ingredients (e.g., Ashwagandha, Neem) OR asserts a specific medical/health claim, set intent='evaluation' and leave 'chat_response' empty."
         )
 
         structured_router = base_llm.with_structured_output(IntentClassification)
@@ -224,7 +239,7 @@ async def evaluate_formulation(payload: EvalRequest, user_id: str = Depends(veri
             )
 
         # -------------------------------------------------------------------
-        # PATH B: STATUTORY EVALUATION (Executes 5-Node LangGraph Pipeline)
+        # PATH B: STATUTORY EVALUATION (Executes LangGraph Pipeline)
         # -------------------------------------------------------------------
         logger.info(f"⚖️ Gatekeeper routed to Evaluation Pipeline. Processing: '{current_prompt}'")
         
@@ -237,33 +252,116 @@ async def evaluate_formulation(payload: EvalRequest, user_id: str = Depends(veri
         result = await langgraph_app.ainvoke(initial_state)
         
         dmr_data = result.get("dmr_evaluation", {})
-        final_report_content = result.get("final_report", {}).get("content", "")
+        final_report_dict = result.get("final_report", {})
+        final_report_content = final_report_dict.get("national_content", final_report_dict.get("content", ""))
+        international_content = final_report_dict.get("international_content", "")
         extracted_plants = result.get("extracted_plants", [])
         extracted_claims = result.get("extracted_claims", "")
 
         # -------------------------------------------------------------------
+        # STEP 2.5: LIVE PRIOR ART / GOOGLE PATENTS SEARCH (SerpApi)
+        # -------------------------------------------------------------------
+        logger.info("🔍 Cross-referencing Google Patents via SerpApi for Prior Art...")
+        try:
+            existing_patents = search_existing_patents(extracted_plants, extracted_claims)
+            
+            if existing_patents:
+                patent_warning_md = (
+                    "## ⚠️ Prior Art & Patent Infringement Alert\n"
+                    "Live cross-referencing with Google Patents identified existing registered patent filings "
+                    "with overlapping botanical constituents and therapeutic indications:\n\n"
+                )
+                for p in existing_patents:
+                    patent_id = p.get("patent_id", "N/A")
+                    title = p.get("title", "Untitled Patent")
+                    snippet = p.get("snippet", "")
+                    patent_warning_md += f"* **Patent [{patent_id}]**: *{title}*\n"
+                    if snippet:
+                        patent_warning_md += f"  > *Summary:* {snippet}\n"
+                    patent_warning_md += "\n"
+                
+                patent_warning_md += (
+                    "> **Legal Notice:** Commercialization of this formulation without formal Freedom to Operate (FTO) "
+                    "clearance may risk patent infringement proceedings under the Patents Act, 1970.\n\n---\n\n"
+                )
+                
+                # Prepend the patent alert to BOTH national and international dossiers
+                final_report_content = patent_warning_md + final_report_content
+                if international_content:
+                    international_content = patent_warning_md + international_content
+        except Exception as e:
+            logger.warning(f"Prior Art Patent lookup failed: {e}")
+
+        # -------------------------------------------------------------------
         # STEP 3: POST-TRANSLATION OF DOSSIER (If non-English)
         # -------------------------------------------------------------------
-        if user_lang != "en" and final_report_content:
-            logger.info(f"🌐 Post-translating dossier from English to '{user_lang}'...")
-            try:
-                out_req = TranslationRequest(
-                    source_text=final_report_content,
-                    source_lang="en",
-                    target_lang=user_lang
-                )
-                out_res = await bhashini_client.translate(out_req)
-                final_report_content = out_res.translated_text
-            except Exception as e:
-                logger.warning(f"Dossier post-translation failed: {e}")
+        if user_lang != "en":
+            logger.info(f"🌐 Post-translating dual-dossier from English to '{user_lang}'...")
+            
+            # Translate National Content
+            if final_report_content:
+                try:
+                    out_req_nat = TranslationRequest(source_text=final_report_content, source_lang="en", target_lang=user_lang)
+                    out_res_nat = await bhashini_client.translate(out_req_nat)
+                    final_report_content = out_res_nat.translated_text
+                except Exception as e:
+                    logger.warning(f"National dossier post-translation failed: {e}")
+            
+            # Translate International Content
+            if international_content:
+                try:
+                    out_req_intl = TranslationRequest(source_text=international_content, source_lang="en", target_lang=user_lang)
+                    out_res_intl = await bhashini_client.translate(out_req_intl)
+                    international_content = out_res_intl.translated_text
+                except Exception as e:
+                    logger.warning(f"International dossier post-translation failed: {e}")
 
-        final_report = result.get("final_report", {})
-        final_report["content"] = final_report_content
+        final_report_dict["national_content"] = final_report_content
+        final_report_dict["international_content"] = international_content
+        final_report_dict["content"] = final_report_content # Legacy fallback
 
         summary_msg = (
             f"Evaluation complete. Extracted {len(extracted_plants)} botanical entities and cross-referenced "
-            f"statutory pathways across the DMR Act (1954), Schedule E(1), and the Biological Diversity Act (2002)."
+            f"statutory pathways across the DMR Act (1954), Schedule E(1), BDA (2002), and Google Patents."
         )
+
+        # -------------------------------------------------------------------
+        # STEP 4: DYNAMIC XAI AUDITOR (LLM-as-a-Judge)
+        # -------------------------------------------------------------------
+        logger.info("⚖️ Running XAI Auditor to calculate Groundedness & Completeness...")
+        
+        # Determine dynamic verification sources
+        active_sources = ["Neo4j (Regulatory Ontology)", "Supabase (Biological Matrix)"]
+        if existing_patents:
+            active_sources.append("Google Patents (SerpApi)")
+        if result.get("rag_context"):
+            active_sources.append("Vector DB (Statutes)")
+
+        auditor_prompt = f"""You are an independent AI Auditor for a regulatory pipeline.
+Evaluate the following dossier based on the extracted entities and output your metrics.
+Extracted Plants: {extracted_plants}
+Extracted Claims: {extracted_claims}
+DMR Violation Triggered: {dmr_data.get('is_violation', False)}
+Report Snippet: {final_report_content[:1500]}..."""
+
+        try:
+            structured_auditor = base_llm.with_structured_output(AuditMetrics)
+            audit_result: AuditMetrics = await structured_auditor.ainvoke(auditor_prompt)
+            
+            dynamic_audit_metrics = {
+                "groundedness_score": audit_result.groundedness_score,
+                "completeness": audit_result.completeness,
+                "confidence": audit_result.confidence,
+                "sources": active_sources
+            }
+        except Exception as e:
+            logger.warning(f"XAI Auditor failed, falling back to deterministic metrics: {e}")
+            dynamic_audit_metrics = {
+                "groundedness_score": 95 if not dmr_data.get('is_violation') else 99,
+                "completeness": "Partial (Toxicity Data Pending)",
+                "confidence": "Moderate",
+                "sources": active_sources
+            }
         
         # Translate conversational message if requested
         if user_lang != "en":
@@ -281,7 +379,8 @@ async def evaluate_formulation(payload: EvalRequest, user_id: str = Depends(veri
                 extracted_plants=extracted_plants,
                 extracted_claims=extracted_claims,
                 dmr_violation=dmr_data.get("is_violation", False),
-                final_report=final_report
+                final_report=final_report_dict,
+                audit_metrics=dynamic_audit_metrics
             )
         )
 

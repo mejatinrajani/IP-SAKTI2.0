@@ -14,11 +14,19 @@ from neo4j import GraphDatabase
 from core.dual_rag_engine import rag_engine
 from schemas import JurisdictionMode
 from core.entity_resolver import entity_resolver
+from core.prior_art import search_existing_patents
 
 load_dotenv()
 logger = logging.getLogger("ORCHESTRATOR")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
-
+class GraphState(TypedDict):
+    user_prompt: str
+    user_language: str
+    extracted_plants: list[str]
+    extracted_claims: str
+    dmr_evaluation: dict
+    final_report: dict
+    prior_art_warnings: list[dict] # Add this exact line
 # ---------------------------------------------------------
 # 1. PYDANTIC SCHEMAS FOR STRUCTURED VALIDATION
 # ---------------------------------------------------------
@@ -75,7 +83,7 @@ NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "sih2026")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 # Structured & Standard LLM instances via Groq
-groq_api_key = os.getenv("GROQ_API_KEY")
+groq_api_key = os.getenv("GROQ_API_KEY_3")
 base_llm = ChatGroq(
     model="openai/gpt-oss-120b",
     api_key=groq_api_key,
@@ -137,16 +145,24 @@ async def evaluate_dmr_compliance(state: OrchestratorState) -> OrchestratorState
         banned_list = ["Diabetes", "Cancer", "Blindness", "Asthma", "Heart Disease", "Kidney Stones", "Paralysis"]
 
     # 2. Context-Aware LLM Evaluator (Distinguishes actual cure claims from legitimate non-curative research)
+    # 2. Context-Aware LLM Evaluator (Distinguishes actual cure claims from legitimate non-curative research)
     dmr_prompt = f"""You are a senior legal examiner under the Drugs and Magic Remedies (Objectionable Advertisements) Act, 1954 and Rule 106 (Schedule J) of the Drugs and Cosmetics Rules, 1945.
 
 List of Statutorily Prohibited Conditions/Diseases:
 {json.dumps(banned_list)}
 
+CRITICAL LEGAL SYNONYM MAPPING:
+- "Arthritis" or "Severe Joint Pain" MUST be classified as the prohibited disease "Rheumatism".
+- "Blood sugar" issues MUST be classified as the prohibited disease "Diabetes".
+- "Vision loss" or "Cataracts" MUST be classified as the prohibited disease "Blindness".
+- "Tumor" MUST be classified as "Cancer".
+
 User's Asserted Claim:
 "{claims}"
 
 Task:
-Determine if the claim legally constitutes an assertion of cure, mitigation, diagnosis, or treatment for any of the prohibited diseases.
+Determine if the claim legally constitutes an assertion of cure, mitigation, diagnosis, or treatment for any of the prohibited diseases. 
+If the claim mentions ANY of the mapped conditions above (like Arthritis), you MUST set 'is_violation' to True and explicitly name the prohibited disease it maps to.
 Permissible non-infringing claims include: general wellness, cosmetic moisturization, dietary nourishment, or scientific in-vitro assay references that explicitly disclaim clinical cures."""
 
     try:
@@ -279,24 +295,35 @@ async def query_supabase_biological(state: OrchestratorState) -> OrchestratorSta
     return state
 
 def synthesize_report(state: OrchestratorState) -> OrchestratorState:
-    """Agent 5: Synthesizes regulatory, biological, and statutory findings into a formal report."""
+    """Agent 5: Synthesizes dual-jurisdiction (National & International) regulatory findings."""
     logger.info("📝 Node 5: Synthesizing Formal Statutory Dossier...")
     
     dmr_info = state.get("dmr_evaluation", {})
     
-    system_prompt = """You are a Principal Patent & Regulatory Examiner for the Ministry of Ayush, Government of India.
+    system_prompt = """You are a Principal Patent & Global Regulatory Examiner for the Ministry of Ayush, Government of India.
 Using the provided regulatory ontology (Neo4j), biological matrices (Supabase), and DMR statutory evaluation, compile a definitive, rigorous regulatory clearance report.
 
 CRITICAL INSTRUCTION:
 Do not invent or hallucinate legal sections. Base your legal reasoning strictly on the provided Neo4j regulatory vectors and DMR evaluation payload.
+If `is_violation` is True in the DMR payload, you MUST set the overall Statutory Decision to "REJECTED - STATUTORY VIOLATION" and heavily cite Section 3(d) of the DMR Act (1954).
 
-Structure Requirements:
-1. Executive Summary & Statutory Decision (State clearly if APPROVED, REJECTED, or CONDITIONAL).
-2. Schedule E(1) Toxicity & Safety Directives (Explicitly mention CDSCO licensing if toxic).
-3. Biological Diversity Act (BDA 2002) (Detail Form 8 for patents or Form 9 for commercial use).
-4. Drugs & Magic Remedies Act (1954) & Schedule J Compliance Review.
-5. Phytochemical & ADMET Matrix Summary (Tabulate compound properties).
-6. Mandatory Action Checklist for Applicant."""
+You MUST format your response strictly into two separate sections using these exact delimiters:
+
+===NATIONAL_REPORT===
+# National Regulatory Clearance Report (India)
+1. Executive Summary & Statutory Decision (APPROVED / REJECTED / CONDITIONAL).
+2. Schedule E(1) Toxicity & Safety Directives.
+3. Biological Diversity Act (BDA 2002).
+4. Drugs & Magic Remedies Act (1954) & Schedule J Compliance.
+5. Phytochemical & ADMET Matrix Summary.
+6. Mandatory Action Checklist.
+
+===INTERNATIONAL_REPORT===
+# International Export & Global Compliance Dossier
+1. US FDA Assessment (21 CFR Part 111 / DSHEA).
+2. European Union (EMA) Compliance (THMPD 2004/24/EC).
+3. Global Labeling & Claim Substantiation.
+4. Export Clearance Directives."""
 
     user_payload = {
         "extracted_plants": state["extracted_plants"],
@@ -312,9 +339,23 @@ Structure Requirements:
             SystemMessage(content=system_prompt),
             HumanMessage(content=json.dumps(user_payload, indent=2))
         ])
+        
+        raw_content = response.content
+        national_content = raw_content
+        international_content = ""
+        
+        if "===INTERNATIONAL_REPORT===" in raw_content:
+            parts = raw_content.split("===INTERNATIONAL_REPORT===")
+            national_content = parts[0].replace("===NATIONAL_REPORT===", "").strip()
+            international_content = parts[1].strip()
+        else:
+            national_content = raw_content.replace("===NATIONAL_REPORT===", "").strip()
+
         state["final_report"] = {
             "status": "success",
-            "content": response.content,
+            "content": national_content, # Fallback
+            "national_content": national_content,
+            "international_content": international_content,
             "dmr_violation": dmr_info.get("is_violation", False),
             "prohibited_disease": dmr_info.get("prohibited_disease_matched")
         }
@@ -323,6 +364,18 @@ Structure Requirements:
         state["final_report"] = {"status": "error", "content": "Statutory synthesis failed."}
         
     return state
+
+async def check_prior_art_node(state: GraphState):
+    logger.info("🔍 Searching for Prior Art / Existing Patents...")
+    plants = state.get("extracted_plants", [])
+    claims = state.get("extracted_claims", "")
+    
+    if plants:
+        patents = search_existing_patents(plants, claims)
+    else:
+        patents = []
+        
+    return {"prior_art_warnings": patents}
 
 async def query_statutory_rag(state: OrchestratorState) -> OrchestratorState:
     """Agent 4.5 (Async): Fetches exact legal texts from Vector DB to prevent LLM hallucination."""
@@ -356,6 +409,21 @@ async def query_statutory_rag(state: OrchestratorState) -> OrchestratorState:
         state["rag_context"] = ""
         
     return state
+
+async def check_prior_art_node(state: GraphState):
+    import logging
+    logger = logging.getLogger("ORCHESTRATOR")
+    logger.info("🔍 Searching for Prior Art / Existing Patents...")
+    
+    plants = state.get("extracted_plants", [])
+    claims = state.get("extracted_claims", "")
+    
+    if plants:
+        patents = search_existing_patents(plants, claims)
+    else:
+        patents = []
+        
+    return {"prior_art_warnings": patents}
 # ---------------------------------------------------------
 # 5. COMPILE THE 5-AGENT LANGGRAPH
 # ---------------------------------------------------------
