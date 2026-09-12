@@ -13,11 +13,11 @@ logger = logging.getLogger("DUAL_RAG_ENGINE")
 
 class DualJurisdictionRAG:
     def __init__(self):
-        self.api_key = os.getenv("GROQ_API_KEY", "")
+        self.api_key = os.getenv("GROQ_API_KEY_5", "")
         self.llm = None
         if self.api_key:
             self.llm = ChatGroq(
-                model="llama-3.1-70b-versatile",
+                model="openai/gpt-oss-120b",
                 temperature=0.1,
                 api_key=self.api_key
             )

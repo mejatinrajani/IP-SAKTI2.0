@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, status
 from schemas import TranslationRequest, TranslationResponse
-from core.sarvam_client import sarvam_client as bhashini_client
+from core.bhashini_client import bhashini_client
 
 router = APIRouter()
 logger = logging.getLogger("ROUTER_LANGUAGE")

@@ -3,7 +3,8 @@ import { PanelLeft, User, LogOut } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AuthModal from './AuthModal';
 
-const SARVAM_LANGUAGES = [
+// 22 Scheduled Indian Languages + English for MeitY Bhashini ULCA Pipeline
+const BHASHINI_LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'hi', label: 'Hindi (हिंदी)' },
   { code: 'bn', label: 'Bengali (বাংলা)' },
@@ -14,7 +15,19 @@ const SARVAM_LANGUAGES = [
   { code: 'kn', label: 'Kannada (ಕನ್ನಡ)' },
   { code: 'ml', label: 'Malayalam (മലയാളം)' },
   { code: 'pa', label: 'Punjabi (ਪੰਜਾਬੀ)' },
-  { code: 'or', label: 'Odia (ଓଡ଼ିଆ)' }
+  { code: 'or', label: 'Odia (ଓଡ଼ିଆ)' },
+  { code: 'as', label: 'Assamese (অসমীয়া)' },
+  { code: 'ur', label: 'Urdu (اردو)' },
+  { code: 'sa', label: 'Sanskrit (संस्कृतम्)' },
+  { code: 'mai', label: 'Maithili (मैथिली)' },
+  { code: 'brx', label: 'Bodo (बड़ो)' },
+  { code: 'doi', label: 'Dogri (डोगरी)' },
+  { code: 'ks', label: 'Kashmiri (कॉशुर)' },
+  { code: 'gom', label: 'Konkani (कोंकणी)' },
+  { code: 'mni', label: 'Manipuri (মৈতৈলোন্)' },
+  { code: 'ne', label: 'Nepali (नेपाली)' },
+  { code: 'sat', label: 'Santali (ᱥᱟᱱᱛᱟᱲᱤ)' },
+  { code: 'sd', label: 'Sindhi (سنڌي)' }
 ];
 
 export default function Navbar({ mainView, setMainView, language, setLanguage, isSidebarOpen, setIsSidebarOpen }) {
@@ -68,7 +81,7 @@ export default function Navbar({ mainView, setMainView, language, setLanguage, i
             onChange={(e) => setLanguage(e.target.value)}
             className="bg-neutral-50 border border-neutral-200 text-neutral-700 text-xs font-medium rounded-lg px-2.5 py-1.5 outline-none focus:border-neutral-900 cursor-pointer"
           >
-            {SARVAM_LANGUAGES.map(lang => (
+            {BHASHINI_LANGUAGES.map(lang => (
               <option key={lang.code} value={lang.code}>{lang.label}</option>
             ))}
           </select>

@@ -39,8 +39,8 @@ class SarvamTranslationClient:
         }
 
         # Fallback LLM (Groq) for unsupported languages or if Sarvam goes down
-        groq_api = os.getenv("GROQ_API_KEY")
-        self.fallback_llm = ChatGroq(model="mixtral-8x7b-32768", api_key=groq_api, temperature=0.1) if groq_api else None
+        groq_api = os.getenv("GROQ_API_KEY_4")
+        self.fallback_llm = ChatGroq(model="openai/gpt-oss-120b", api_key=groq_api, temperature=0.1) if groq_api else None
 
     def _chunk_text(self, text: str) -> List[str]:
         """Intelligently chunks long text by paragraphs to respect API limits."""
