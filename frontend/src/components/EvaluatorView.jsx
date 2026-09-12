@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square, Download } from 'lucide-react';
+import { useReactToPrint } from 'react-to-print';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -19,6 +20,9 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const recognitionRef = useRef(null);
+
+  const dossierRef = useRef(null);
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
   // Load chat messages from Supabase whenever activeChatId changes
   useEffect(() => {
@@ -119,6 +123,23 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
     utterance.onend = () => setIsSpeaking(false);
     window.speechSynthesis.speak(utterance);
     setIsSpeaking(true);
+  };
+
+  // 1. Initialize the print hook with V3 syntax
+  const triggerPrint = useReactToPrint({
+    contentRef: dossierRef, // <-- V3 requires contentRef
+    documentTitle: `IP_SAKTI_Clearance_${jurisdiction.toUpperCase()}`,
+  });
+
+  // 2. Wrap it in our button handler
+  const handleDownloadPDF = () => {
+    setIsGeneratingPDF(true);
+    triggerPrint();
+    
+    // Reset the button state after a short delay
+    setTimeout(() => {
+      setIsGeneratingPDF(false);
+    }, 1000);
   };
 
   const handleSend = async (e) => {
@@ -361,77 +382,105 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                 </button>
               </div>
 
-              <button 
-                onClick={() => setActiveReport(null)}
-                className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-colors text-sm font-semibold"
-              >
-                ✕
-              </button>
-            </div>
+              <div className="flex items-center gap-2">
+                {/* PDF Download Button */}
+                <button 
+                  onClick={handleDownloadPDF}
+                  disabled={isGeneratingPDF}
+                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors text-xs font-semibold disabled:opacity-50"
+                  title="Save as PDF"
+                >
+                  <Download className="w-4 h-4" />
+                  {isGeneratingPDF ? 'Opening...' : 'Save PDF'}
+                </button>
+
+                <button 
+                  onClick={() => setActiveReport(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-colors text-sm font-semibold"
+                >
+                  ✕
+                </button>
+              </div>
+          </div>
             
-            <div className="p-6 overflow-y-auto flex-1">
-              <MarkdownRenderer 
-                content={
-                  jurisdiction === 'national' 
-                    ? (activeReport.final_report?.national_content || activeReport.final_report?.content) 
-                    : (activeReport.final_report?.international_content || 'No international dossier generated for this query.')
-                } 
-              />
-              {/* DYNAMIC AI Audit & Provenance Footer */}
-              {activeReport.audit_metrics && (
-                <div className="mt-8 pt-4 border-t border-neutral-200 bg-neutral-50 rounded-xl p-4">
-                  <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-3">
-                    AI Audit & Traceability Report
-                  </h4>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Groundedness Metric */}
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-neutral-500 uppercase">Statutory Faithfulness</span>
-                      <div className="flex items-center gap-2 mt-1">
-                        <div className="w-full bg-neutral-200 rounded-full h-1.5">
-                          <div 
-                            className={`h-1.5 rounded-full ${activeReport.audit_metrics.groundedness_score >= 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
-                            style={{ width: `${activeReport.audit_metrics.groundedness_score}%` }}
-                          ></div>
+            {/* 1. SCROLLING CONTAINER: Removed the ref from here and added a gray background */}
+            <div className="p-6 overflow-y-auto flex-1 bg-neutral-100">
+              
+              {/* 2. THE PDF "PAPER" CONTAINER: Attached the ref here so it has no scroll limits */}
+              <div ref={dossierRef} className="bg-white p-4 md:p-8 rounded-sm shadow-sm">
+                
+                {/* 3. PDF HEADER: Prints nicely at the top of the downloaded document */}
+                <div className="mb-6 pb-4 border-b border-neutral-200">
+                  <h2 className="text-xl font-bold text-neutral-900">IP-SAKTI 2.0 Clearance Dossier</h2>
+                  <p className="text-sm text-neutral-500">
+                    Jurisdiction: {jurisdiction === 'national' ? 'India (AYUSH/CDSCO)' : 'Global Export'}
+                  </p>
+                </div>
+
+                <MarkdownRenderer 
+                  content={
+                    jurisdiction === 'national' 
+                      ? (activeReport.final_report?.national_content || activeReport.final_report?.content) 
+                      : (activeReport.final_report?.international_content || 'No international dossier generated for this query.')
+                  } 
+                />
+                
+                {/* DYNAMIC AI Audit & Provenance Footer */}
+                {activeReport.audit_metrics && (
+                  <div className="mt-8 pt-4 border-t border-neutral-200 bg-neutral-50 rounded-xl p-4">
+                    <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-3">
+                      AI Audit & Traceability Report
+                    </h4>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Groundedness Metric */}
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-neutral-500 uppercase">Statutory Faithfulness</span>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-full bg-neutral-200 rounded-full h-1.5">
+                            <div 
+                              className={`h-1.5 rounded-full ${activeReport.audit_metrics.groundedness_score >= 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                              style={{ width: `${activeReport.audit_metrics.groundedness_score}%` }}
+                            ></div>
+                          </div>
+                          <span className={`text-xs font-bold ${activeReport.audit_metrics.groundedness_score >= 90 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                            {activeReport.audit_metrics.groundedness_score}%
+                          </span>
                         </div>
-                        <span className={`text-xs font-bold ${activeReport.audit_metrics.groundedness_score >= 90 ? 'text-emerald-700' : 'text-amber-700'}`}>
-                          {activeReport.audit_metrics.groundedness_score}%
+                        <span className="text-[10px] text-neutral-400 mt-1">Dynamic LLM-as-a-Judge Score</span>
+                      </div>
+
+                      {/* Knowledge Limit / Confidence */}
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-neutral-500 uppercase">Data Completeness</span>
+                        <span className={`text-xs font-bold mt-1 flex items-center gap-1 ${
+                          activeReport.audit_metrics.confidence === 'High' ? 'text-emerald-600' : 'text-amber-600'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${
+                            activeReport.audit_metrics.confidence === 'High' ? 'bg-emerald-500' : 'bg-amber-500'
+                          }`}></span>
+                          {activeReport.audit_metrics.confidence}
+                        </span>
+                        <span className="text-[10px] text-neutral-400 mt-1 line-clamp-1" title={activeReport.audit_metrics.completeness}>
+                          {activeReport.audit_metrics.completeness}
                         </span>
                       </div>
-                      <span className="text-[10px] text-neutral-400 mt-1">Dynamic LLM-as-a-Judge Score</span>
-                    </div>
 
-                    {/* Knowledge Limit / Confidence */}
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-neutral-500 uppercase">Data Completeness</span>
-                      <span className={`text-xs font-bold mt-1 flex items-center gap-1 ${
-                        activeReport.audit_metrics.confidence === 'High' ? 'text-emerald-600' : 'text-amber-600'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          activeReport.audit_metrics.confidence === 'High' ? 'bg-emerald-500' : 'bg-amber-500'
-                        }`}></span>
-                        {activeReport.audit_metrics.confidence}
-                      </span>
-                      <span className="text-[10px] text-neutral-400 mt-1 line-clamp-1" title={activeReport.audit_metrics.completeness}>
-                        {activeReport.audit_metrics.completeness}
-                      </span>
-                    </div>
-
-                    {/* Provenance / Audit Trail */}
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-neutral-500 uppercase">Verification Sources</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {activeReport.audit_metrics.sources?.map((source, idx) => (
-                          <span key={idx} className="text-[9px] px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded">
-                            {source}
-                          </span>
-                        ))}
+                      {/* Provenance / Audit Trail */}
+                      <div className="flex flex-col">
+                        <span className="text-[10px] text-neutral-500 uppercase">Verification Sources</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {activeReport.audit_metrics.sources?.map((source, idx) => (
+                            <span key={idx} className="text-[9px] px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded">
+                              {source}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
