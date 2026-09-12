@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import EvaluatorView from './components/EvaluatorView';
 import ABSCalculator from './components/ABSCalculator';
@@ -79,14 +78,6 @@ function MainLayout() {
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
-        <Navbar
-          mainView={mainView}
-          setMainView={setMainView}
-          language={language}
-          setLanguage={setLanguage}
-          isSidebarOpen={isSidebarOpen}
-          setIsSidebarOpen={setIsSidebarOpen}
-        />
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto flex flex-col items-center justify-center">
           {mainView === 'evaluator' ? (
@@ -114,3 +105,5 @@ export default function App() {
     </AuthProvider>
   );
 }
+
+
