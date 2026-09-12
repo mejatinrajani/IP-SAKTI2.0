@@ -20,6 +20,7 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const recognitionRef = useRef(null);
+  const textBeforeMic = useRef('');
 
   const dossierRef = useRef(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -71,36 +72,65 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
   // Initialize Speech-to-Text (Microphone)
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
-      recognitionRef.current.lang = language === 'hi' ? 'hi-IN' : 'en-IN'; // Support Hindi/English
-
-      recognitionRef.current.onresult = (event) => {
-        const transcript = Array.from(event.results)
-          .map(result => result[0])
-          .map(result => result.transcript)
-          .join('');
-        setQuery(transcript);
-      };
-
-      recognitionRef.current.onerror = () => setIsListening(false);
-      recognitionRef.current.onend = () => setIsListening(false);
+    if (!SpeechRecognition) {
+      console.warn("Speech Recognition API not supported in this browser.");
+      return;
     }
-    
-    // Cleanup Text-to-Speech on unmount
-    return () => window.speechSynthesis.cancel();
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = language === 'hi' ? 'hi-IN' : 'en-IN';
+
+    recognition.onstart = () => {
+      setIsListening(true);
+    };
+
+    recognition.onresult = (event) => {
+      let currentTranscript = '';
+      // Safely iterate through the ResultList (more reliable than Array.from)
+      for (let i = 0; i < event.results.length; i++) {
+        currentTranscript += event.results[i][0].transcript;
+      }
+      // Append the live dictation to whatever was already in the input box
+      setQuery((textBeforeMic.current + ' ' + currentTranscript).trim());
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Mic error:", event.error);
+      setIsListening(false);
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    recognitionRef.current = recognition;
+
+    // Cleanup Text-to-Speech & Mic on unmount
+    return () => {
+      recognition.stop();
+      window.speechSynthesis.cancel();
+    };
   }, [language]);
 
   const toggleListening = (e) => {
     e.preventDefault();
+    if (!recognitionRef.current) {
+      alert("Voice input is not supported in your browser. Please use Chrome or Edge.");
+      return;
+    }
+
     if (isListening) {
-      recognitionRef.current?.stop();
+      recognitionRef.current.stop();
     } else {
-      setQuery(''); // Clear previous text when starting new dictation
-      recognitionRef.current?.start();
-      setIsListening(true);
+      // Save the current input text before starting the mic so we don't overwrite it
+      textBeforeMic.current = query;
+      try {
+        recognitionRef.current.start();
+      } catch (err) {
+        console.error("Mic start error:", err);
+      }
     }
   };
 
