@@ -1,0 +1,25 @@
+# Web Framework & Server
+fastapi
+uvicorn
+
+# Async HTTP & Environment
+httpx
+python-dotenv
+
+# Data Validation & Typing
+pydantic
+typing-extensions
+
+# Agent Orchestration & LLMs
+langchain-groq
+langchain-core
+langgraph
+
+# Databases (Vector, Graph, Relational)
+chromadb
+sentence-transformers
+neo4j
+supabase
+
+# External APIs (Assuming official SerpApi client is used for Node 5)
+google-search-results
