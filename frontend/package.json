@@ -20,7 +20,9 @@
     "react-intersection-observer": "^11.0.1",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.3",
-    "remark-gfm": "^4.0.1"
+    "react-to-print": "^3.3.0",
+    "remark-gfm": "^4.0.1",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.1",
