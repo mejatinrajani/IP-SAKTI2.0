@@ -40,7 +40,7 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
 
     const fetchMessages = async () => {
       const { data } = await supabase
-        .from('messages')
+        .from('messages') 
         .select('*')
         .eq('chat_id', activeChatId)
         .order('created_at', { ascending: true });
@@ -92,16 +92,31 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
       for (let i = 0; i < event.results.length; i++) {
         currentTranscript += event.results[i][0].transcript;
       }
-      // Append the live dictation to whatever was already in the input box
-      setQuery((textBeforeMic.current + ' ' + currentTranscript).trim());
+      const baseText = textBeforeMic.current ? textBeforeMic.current + ' ' : '';
+      setQuery(baseText + currentTranscript.trimStart());
     };
 
+    // Replace your current recognition.onerror and recognition.onend with this:
+
     recognition.onerror = (event) => {
-      console.error("Mic error:", event.error);
-      setIsListening(false);
+      console.warn("Mic error caught:", event.error);
+      
+      if (event.error === 'no-speech') {
+        // Do not immediately set isListening to false here.
+        // Chrome will automatically trigger onend next.
+        return;
+      }
+      
+      if (event.error === 'not-allowed' || event.error === 'audio-capture') {
+        alert("Microphone access denied or unavailable. Please check your browser permissions.");
+        setIsListening(false);
+      }
     };
 
     recognition.onend = () => {
+      // If the browser stopped the mic due to a pause (no-speech) 
+      // but the user still wants to be listening, you can optionally restart it here.
+      // For standard behavior, just reset the UI so they can click it again:
       setIsListening(false);
     };
 
@@ -176,6 +191,11 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
     e.preventDefault();
     if (!query.trim() || isLoading) return;
 
+    // 1. ADD THIS: Stop the mic and clear context when sending a message
+    if (isListening && recognitionRef.current) {
+      recognitionRef.current.stop();
+    }
+    textBeforeMic.current = '';
     const userText = query.trim();
     setQuery('');
     
@@ -355,7 +375,13 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              
+              if (isListening && recognitionRef.current) {
+                recognitionRef.current.stop();
+              }
+            }}
             placeholder="Type your formulation details or ask a regulatory question..."
             disabled={isLoading}
             className="flex-1 bg-transparent px-2 py-2 text-sm text-neutral-800 outline-none placeholder-neutral-400"
