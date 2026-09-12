@@ -1,10 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-<<<<<<< HEAD
-import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square } from 'lucide-react';
-=======
-import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Link, TriangleAlert, ShieldCheck, Leaf, Paperclip, Download, X } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square, Link, TriangleAlert, ShieldCheck, Leaf, Paperclip, Download, X, Maximize2, ChevronDown, Table } from 'lucide-react';
 import html2pdf from 'html2pdf.js';
->>>>>>> e825f0d (UI enhancements for IP-SAKTI 2.0)
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -37,14 +33,11 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
     return 'evening';
   };
 
-<<<<<<< HEAD
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const recognitionRef = useRef(null);
 
   // Load chat messages from Supabase whenever activeChatId changes
-=======
->>>>>>> e825f0d (UI enhancements for IP-SAKTI 2.0)
   useEffect(() => {
     if (!activeChatId) {
       setMessages([]);
@@ -106,8 +99,12 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
       recognitionRef.current.onend = () => setIsListening(false);
     }
     
-    // Cleanup Text-to-Speech on unmount
-    return () => window.speechSynthesis.cancel();
+    // Load voices early and cleanup Text-to-Speech on unmount
+    window.speechSynthesis.getVoices();
+    return () => {
+      window.speechSynthesis.cancel();
+      if (window.speechInterval) clearInterval(window.speechInterval);
+    };
   }, [language]);
 
   const toggleListening = (e) => {
@@ -123,11 +120,15 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
 
   // Text-to-Speech (Read Aloud)
   const handleSpeak = (text) => {
-    if (isSpeaking) {
+    if (!text) return;
+
+    if (isSpeaking || window.speechSynthesis.speaking) {
       window.speechSynthesis.cancel();
+      if (window.speechInterval) clearInterval(window.speechInterval);
       setIsSpeaking(false);
       return;
     }
+
     // Clean markdown characters so the bot doesn't read "hash hash asterisk"
     const cleanText = text.replace(/[#*_>\[\]]/g, '');
     const utterance = new SpeechSynthesisUtterance(cleanText);
@@ -137,9 +138,28 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
     const indianVoice = voices.find(v => v.lang.includes('IN') || v.lang.includes('hi'));
     if (indianVoice) utterance.voice = indianVoice;
     
-    utterance.onend = () => setIsSpeaking(false);
+    utterance.onend = () => {
+      setIsSpeaking(false);
+      if (window.speechInterval) clearInterval(window.speechInterval);
+    };
+    utterance.onerror = () => {
+      setIsSpeaking(false);
+      if (window.speechInterval) clearInterval(window.speechInterval);
+    };
+
     window.speechSynthesis.speak(utterance);
     setIsSpeaking(true);
+
+    // Chrome 15-second bug workaround: keep utterance alive
+    if (window.speechInterval) clearInterval(window.speechInterval);
+    window.speechInterval = setInterval(() => {
+      if (!window.speechSynthesis.speaking) {
+        clearInterval(window.speechInterval);
+      } else {
+        window.speechSynthesis.pause();
+        window.speechSynthesis.resume();
+      }
+    }, 14000);
   };
 
   const handleSend = async (e) => {
@@ -278,13 +298,24 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                       <button 
                         key={chat.id}
                         onClick={() => onSelectChat && onSelectChat(chat.id)} 
-                        className="p-4 text-left border rounded-sm hover:bg-white transition-all text-sm group"
-                        style={{ borderColor: '#E5E7EB', color: 'var(--color-text-muted)' }}
+                        className="border border-gray-200 bg-white p-4 rounded-sm hover:border-slate-400 transition-colors text-left flex flex-col gap-2 w-full"
                       >
-                        <span className="font-semibold block mb-1 group-hover:text-[var(--color-accent)] transition-colors line-clamp-1" style={{ color: 'var(--color-base-navy)' }}>
-                          {chat.title || 'Untitled Evaluation'}
-                        </span>
-                        <span className="text-xs opacity-80">
+                        {/* Top row */}
+                        <div className="flex justify-between items-start w-full gap-2">
+                          <span className="font-bold truncate text-slate-900 text-sm">
+                            {chat.title || 'Untitled Evaluation'}
+                          </span>
+                          <span className="bg-red-50 text-red-700 border border-red-200 text-xs px-2 py-0.5 rounded-sm font-medium shrink-0">
+                            Evaluated
+                          </span>
+                        </div>
+                        {/* Middle row */}
+                        <div className="flex flex-wrap gap-1">
+                          <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-sm font-mono">Botanical 1</span>
+                          <span className="text-xs bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded-sm font-mono">Botanical 2</span>
+                        </div>
+                        {/* Bottom row */}
+                        <span className="text-xs text-slate-400">
                           {new Date(chat.created_at).toLocaleDateString()}
                         </span>
                       </button>
@@ -292,6 +323,19 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                   </div>
                 </div>
               )}
+
+              {/* Regulatory Quick-Action Chips */}
+              <div className="flex flex-wrap gap-2 pt-4 w-full">
+                <button onClick={() => setQuery("Check Schedule E(1) toxicity listing")} className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs px-3 py-1.5 rounded-sm cursor-pointer transition-colors">
+                  Check Schedule E(1) toxicity listing
+                </button>
+                <button onClick={() => setQuery("Screen formulation against DMR Act prohibited claims")} className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs px-3 py-1.5 rounded-sm cursor-pointer transition-colors">
+                  Screen formulation against DMR Act prohibited claims
+                </button>
+                <button onClick={() => setQuery("Calculate NBA Access & Benefit Sharing (ABS) fee")} className="border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs px-3 py-1.5 rounded-sm cursor-pointer transition-colors">
+                  Calculate NBA Access & Benefit Sharing (ABS) fee
+                </button>
+              </div>
             </div>
           )}
 
@@ -316,117 +360,6 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
 
               {/* AI Message */}
               {msg.role === 'ai' && (
-<<<<<<< HEAD
-                <div className="flex items-center gap-1 mt-2 text-neutral-400 opacity-80 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleSpeak(msg.report_data ? msg.report_data.final_report.content : msg.text_content)}
-                    className="p-1 hover:text-neutral-700 rounded transition-colors"
-                    title={isSpeaking ? "Stop reading" : "Read aloud"}
-                  >
-                    {isSpeaking ? <Square className="w-3.5 h-3.5 text-red-600" /> : <Volume2 className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => handleCopy(msg.id, msg.text_content)}
-                    className="p-1 hover:text-neutral-700 rounded transition-colors"
-                    title="Copy text"
-                  >
-                    {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => handleFeedback(msg.id, msg.feedback === 'like' ? 'none' : 'like')}
-                    className={`p-1 rounded transition-colors ${msg.feedback === 'like' ? 'text-indigo-600' : 'hover:text-neutral-700'}`}
-                    title="Helpful"
-                  >
-                    <ThumbsUp className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => handleFeedback(msg.id, msg.feedback === 'dislike' ? 'none' : 'dislike')}
-                    className={`p-1 rounded transition-colors ${msg.feedback === 'dislike' ? 'text-red-600' : 'hover:text-neutral-700'}`}
-                    title="Not helpful"
-                  >
-                    <ThumbsDown className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        ))}
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-neutral-50 border border-neutral-200/70 rounded-2xl rounded-tl-xs px-4 py-3 flex gap-1.5 items-center">
-              <div className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" />
-              <div className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-              <div className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:0.4s]" />
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Input Form */}
-      <div className="p-3 border-t border-neutral-100 bg-white">
-        <form onSubmit={handleSend} className="relative flex items-center bg-neutral-50 rounded-2xl border border-neutral-200/90 px-3 py-1.5 focus-within:ring-2 focus-within:ring-neutral-900/10 focus-within:border-neutral-900 transition-all">
-          <input
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Type your formulation details or ask a regulatory question..."
-            disabled={isLoading}
-            className="flex-1 bg-transparent px-2 py-2 text-sm text-neutral-800 outline-none placeholder-neutral-400"
-          />
-          <button
-            type="button"
-            onClick={toggleListening}
-            className={`p-2 rounded-xl transition-all mr-1 ${
-              isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-neutral-500 hover:bg-neutral-200'
-            }`}
-            title="Dictate prompt"
-          >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading || !query.trim()}
-            className="p-2 bg-neutral-900 text-white rounded-xl hover:bg-neutral-800 disabled:opacity-20 transition-all ml-1"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
-        </form>
-      </div>
-
-      {/* Dossier Canvas Side Panel */}
-      {activeReport && (
-        <div className="absolute inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-xs" onClick={() => setActiveReport(null)} />
-          <div className="relative w-full md:w-3/4 bg-white h-full shadow-2xl flex flex-col border-l border-neutral-200 animate-slide-in-right">
-            
-            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <div>
-                <h3 className="text-base font-bold text-neutral-900">Statutory Dossier Canvas</h3>
-                <p className="text-xs text-neutral-500">Ministry of Ayush Regulatory Synthesis</p>
-              </div>
-              
-              {/* Jurisdiction Toggle */}
-              <div className="flex bg-neutral-200/70 p-1 rounded-xl mx-4">
-                <button
-                  onClick={() => setJurisdiction('national')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    jurisdiction === 'national' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  🇮🇳 National
-                </button>
-                <button
-                  onClick={() => setJurisdiction('international')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    jurisdiction === 'international' ? 'bg-white text-indigo-700 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  🌐 International
-                </button>
-              </div>
-
-=======
                 <div 
                   className="max-w-[95%] md:max-w-[85%] rounded-[12px] px-5 py-4 shadow-sm"
                   style={{ 
@@ -508,6 +441,13 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
 
                   {/* Action Toolbar */}
                   <div className="flex items-center gap-1 mt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => handleSpeak(msg.report_data?.final_report?.content || msg.text_content)}
+                      className="p-1 hover:text-neutral-700 rounded transition-colors"
+                      title={isSpeaking ? "Stop reading" : "Read aloud"}
+                    >
+                      {isSpeaking ? <Square className="w-3.5 h-3.5 text-red-600" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    </button>
                     <button onClick={() => handleCopy(msg.id, msg.text_content)} className="p-1 rounded transition-colors" style={{ color: 'var(--color-text-muted)' }} title="Copy">
                       {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
@@ -538,10 +478,15 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
         {/* Input Area */}
         <div className="w-full px-4 pb-4 md:pb-8 bg-transparent">
           <div className="mx-auto w-full max-w-3xl">
-            <form onSubmit={handleSend} className="flex items-end gap-2 rounded-2xl bg-white border border-[#E5E7EB] shadow-sm px-3 py-2.5 focus-within:ring-2 focus-within:ring-gray-200 transition-all">
+            <form onSubmit={handleSend} className="flex items-end gap-2 rounded-sm bg-white border border-[#E5E7EB] shadow-sm px-3 py-2.5 focus-within:ring-2 focus-within:ring-gray-200 transition-all">
             
-            <button type="button" className="p-2 shrink-0 rounded-xl hover:bg-gray-100 transition-colors mb-0.5" style={{ color: 'var(--color-text-muted)' }} title="Attach file">
+            <button type="button" className="p-2 shrink-0 rounded-sm hover:bg-gray-100 transition-colors mb-0.5 flex items-center justify-center gap-1" style={{ color: 'var(--color-text-muted)' }} title="Attach file">
               <Paperclip className="w-5 h-5" />
+            </button>
+
+            <button type="button" className="p-2 shrink-0 rounded-sm hover:bg-gray-100 transition-colors mb-0.5 flex items-center justify-center gap-1" style={{ color: 'var(--color-text-muted)' }} title="Upload Table / CSV">
+              <Table className="w-5 h-5" />
+              <span className="text-[10px] font-medium sr-only md:not-sr-only md:inline-block">CSV</span>
             </button>
 
             <textarea
@@ -550,7 +495,7 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
               placeholder="Type formulation details or ask a question..."
               disabled={isLoading}
               rows={1}
-              className="flex-1 bg-transparent px-2 py-2 text-[15px] outline-none resize-none min-h-[40px] max-h-[160px] overflow-y-auto"
+              className="flex-1 bg-transparent px-2 py-2 text-[15px] outline-none resize-none min-h-[40px] max-h-[160px] overflow-y-auto custom-scrollbar"
               style={{ color: 'var(--color-base-navy)' }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -561,19 +506,31 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
             />
             
             <button
+              type="button"
+              onClick={toggleListening}
+              className={`p-2 shrink-0 rounded-sm transition-all mr-1 mb-0.5 flex items-center justify-center ${
+                isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-neutral-500 hover:bg-neutral-200'
+              }`}
+              title="Dictate prompt"
+            >
+              {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+            </button>
+
+            <button
               type="submit"
               disabled={isLoading || !query.trim()}
-              className="p-2 shrink-0 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center mb-0.5"
+              className="p-2 shrink-0 rounded-sm transition-all disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center mb-0.5 bg-[#0284C7] text-white"
               style={{ background: '#0284C7', color: '#FFFFFF' }}
               onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
               onMouseLeave={e => e.currentTarget.style.opacity = '1'}
             >
-              <ArrowUp className="w-5 h-5" />
+              <ArrowUp className="w-5 h-5 text-white" strokeWidth={3} />
             </button>
           </form>
           </div>
         </div>
       </div>
+
 
       {/* Claude-style Artifact Side Panel */}
       {activeReport && (
@@ -623,17 +580,59 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                 <Download className="w-3.5 h-3.5" />
                 Download PDF
               </button>
->>>>>>> e825f0d (UI enhancements for IP-SAKTI 2.0)
-              <button 
-                onClick={() => setActiveReport(null)}
-                className="p-1.5 rounded-md transition-colors"
-                style={{ color: 'var(--color-surface)' }}
-                onMouseEnter={e => { e.currentTarget.style.background = 'var(--color-base-navy-panel)'; e.currentTarget.style.color = 'var(--color-accent)'; }}
-                onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--color-surface)'; }}
-                title="Close"
-              >
-                <X className="w-4 h-4" />
-              </button>
+
+              <div className="flex bg-[#1E293B] p-1 rounded-sm shadow-none mx-4">
+                <button
+                  onClick={() => setJurisdiction('national')}
+                  className={`flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-sm shadow-none transition-all ${
+                    jurisdiction === 'national' ? 'bg-[#0284C7] text-white' : 'bg-transparent text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  National
+                </button>
+                <button
+                  onClick={() => setJurisdiction('international')}
+                  className={`flex items-center justify-center px-4 py-1.5 text-sm font-medium rounded-sm shadow-none transition-all ${
+                    jurisdiction === 'international' ? 'bg-[#0284C7] text-white' : 'bg-transparent text-gray-400 hover:text-gray-200'
+                  }`}
+                >
+                  International
+                </button>
+              </div>
+
+              <div className="flex items-center bg-[#1E293B] rounded-sm shadow-none p-1">
+                <button
+                  className="flex items-center gap-1.5 px-2.5 py-1 text-[13px] font-medium text-gray-200 hover:text-white hover:bg-white/10 rounded-sm transition-colors"
+                  onClick={() => {
+                    navigator.clipboard.writeText(
+                      jurisdiction === 'national' 
+                        ? (activeReport.final_report?.national_content || activeReport.final_report?.content || '') 
+                        : (activeReport.final_report?.international_content || '')
+                    );
+                  }}
+                  title="Copy content"
+                >
+                  Copy
+                  <ChevronDown className="w-3.5 h-3.5 opacity-60 ml-0.5" />
+                </button>
+
+                <div className="w-[1px] h-4 bg-gray-600 mx-1"></div>
+
+                <button 
+                  className="p-1 text-gray-300 hover:text-white hover:bg-white/10 rounded-sm transition-colors"
+                  title="Expand"
+                >
+                  <Maximize2 className="w-4 h-4" />
+                </button>
+
+                <button 
+                  onClick={() => setActiveReport(null)}
+                  className="p-1 text-gray-300 hover:text-white hover:bg-white/10 rounded-sm transition-colors ml-0.5"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </div>
           </div>
           
@@ -706,7 +705,6 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                   </div>
                 </div>
               )}
-            </div>
             </div>
           </div>
 

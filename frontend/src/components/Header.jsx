@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, NavLink, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../context/AuthContext'
 
@@ -11,17 +11,36 @@ const navLinks = [
   { labelKey: 'resources',    path: '/resources' },
 ]
 
+const anchorLinks = [
+  { label: 'Features', anchor: '#features' },
+  { label: 'Pricing',  anchor: '#pricing' },
+  { label: 'FAQ',      anchor: '#faq' },
+]
+
 export default function Header({ t }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [scrolled, setScrolled]  = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
   const { user, signOut } = useAuth()
+
+  const isHomepage = location.pathname === '/'
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', onScroll)
     return () => window.removeEventListener('scroll', onScroll)
   }, [])
+
+  const handleAnchorClick = (anchor) => {
+    if (isHomepage) {
+      const el = document.querySelector(anchor)
+      el?.scrollIntoView({ behavior: 'smooth' })
+    } else {
+      navigate('/' + anchor)
+    }
+    setMenuOpen(false)
+  }
 
   return (
     <header className={`bg-white sticky top-0 z-50 transition-shadow duration-300 ${scrolled ? 'shadow-md' : 'border-b border-gray-200'}`}>
@@ -46,6 +65,7 @@ export default function Header({ t }) {
 
         {/* Desktop Nav */}
         <nav className="hidden lg:flex items-center gap-1">
+          {/* Page links */}
           {navLinks.map(({ labelKey, path }) => (
             <NavLink
               key={path}
@@ -61,10 +81,22 @@ export default function Header({ t }) {
               {t.nav[labelKey]}
             </NavLink>
           ))}
+          {/* Separator */}
+          <div className="w-px h-5 bg-gray-200 mx-2" />
+          {/* Anchor links (visible on homepage or as scroll targets) */}
+          {anchorLinks.map(({ label, anchor }) => (
+            <button
+              key={anchor}
+              onClick={() => handleAnchorClick(anchor)}
+              className="text-sm font-medium px-3 py-2 text-gray-400 hover:text-navy-900 transition-colors"
+            >
+              {label}
+            </button>
+          ))}
         </nav>
 
         {/* Actions */}
-        <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+        <div className="hidden lg:flex items-center gap-3 flex-shrink-0">
           {user ? (
             <>
               <span className="text-xs text-gray-400 max-w-[140px] truncate">{user.email}</span>
@@ -80,9 +112,15 @@ export default function Header({ t }) {
               onClick={() => navigate('/auth')}
               className="text-sm text-gray-500 hover:text-navy-900 font-medium px-4 py-2 transition-colors"
             >
-              {t.signIn}
+              Log in
             </button>
           )}
+          <button
+            onClick={() => navigate(user ? '/evaluate' : '/auth')}
+            className="bg-navy-900 text-white text-sm font-semibold px-5 py-2.5 hover:bg-navy-700 transition-colors tracking-wide"
+          >
+            Get Started →
+          </button>
         </div>
 
         {/* Mobile toggle */}
@@ -118,6 +156,17 @@ export default function Header({ t }) {
                   {t.nav[labelKey]}
                 </Link>
               ))}
+              <div className="border-t border-gray-100 pt-3 mt-2">
+                {anchorLinks.map(({ label, anchor }) => (
+                  <button
+                    key={anchor}
+                    onClick={() => handleAnchorClick(anchor)}
+                    className="block w-full text-left text-sm text-gray-500 font-medium py-2.5 px-3 hover:bg-gray-50 transition-colors"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
               <div className="border-t border-gray-100 pt-4 mt-2 flex flex-col gap-2">
                 {user ? (
                   <>
@@ -129,6 +178,12 @@ export default function Header({ t }) {
                   <button onClick={() => { setMenuOpen(false); navigate('/auth') }}
                     className="text-sm text-gray-500 font-medium text-left px-3 py-2">{t.signIn}</button>
                 )}
+                <button
+                  onClick={() => { setMenuOpen(false); navigate(user ? '/evaluate' : '/auth') }}
+                  className="bg-navy-900 text-white text-sm font-semibold px-5 py-3 mx-3 text-center tracking-wide"
+                >
+                  Get Started →
+                </button>
               </div>
             </div>
           </motion.div>
