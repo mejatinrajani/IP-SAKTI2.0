@@ -14,10 +14,10 @@ class KnowledgeGraphEngine:
         # Load variables from .env
         load_dotenv()
 
-        self.uri = os.environ["NEO4J_URI"]
-        self.user = os.environ["NEO4J_USER"]
-        self.password = os.environ["NEO4J_PASSWORD"]
-        self.database = os.environ.get("NEO4J_DATABASE", "neo4j") 
+        self.uri = os.environ.get("NEO4J_URI", "")
+        self.user = os.environ.get("NEO4J_USERNAME") or os.environ.get("NEO4J_USER", "neo4j")
+        self.password = os.environ.get("NEO4J_PASSWORD", "")
+        self.database = os.environ.get("NEO4J_DATABASE", "neo4j")
 
         self.driver = AsyncGraphDatabase.driver(
             self.uri,

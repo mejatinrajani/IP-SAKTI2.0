@@ -1,6 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'your-anon-key';
+const supabaseUrl  = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnon = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnon) {
+  console.error('[IP-SAKTI] Missing Supabase env vars.')
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnon, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,        // keeps user logged in across page refreshes
+    detectSessionInUrl: true,    // handles email confirmation redirect links
+  },
+})

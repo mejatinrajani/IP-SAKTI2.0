@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+pydantic
+supabase
+python-dotenv
+langgraph
+langchain-openai
+langchain-groq
+pandas
+neo4j
+chromadb
+sentence-transformers

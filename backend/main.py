@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import compliance, ip_core, innovation, language, orchestrator
+from routers import compliance, ip_core, innovation, language, orchestrator, auth
 
 app = FastAPI(
     title="IP-SAKTI Sahayak 2.0 Engine",
@@ -22,6 +22,7 @@ app.include_router(compliance.router, prefix="/api/v1/compliance", tags=["Module
 app.include_router(innovation.router, prefix="/api/v1/innovation", tags=["Module 3: Innovation & Graph"])
 app.include_router(language.router, prefix="/api/v1/language", tags=["Module 4: Multilingual (Bhashini)"])
 app.include_router(orchestrator.router, prefix="/api/v1/orchestrate", tags=["Master Pipeline"])
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 
 @app.get("/health", tags=["System"])
 async def system_health_check():
