@@ -329,7 +329,7 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                     onClick={() => setActiveReport(msg.report_data)}
                     className="w-full sm:w-auto bg-teal-800 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-teal-700 transition-all shadow-sm flex items-center justify-center gap-2"
                   >
-                    Open Regulatory Canvas ↗
+                    Open Detailed Report ↗
                   </button>
                 </div>
               )}
