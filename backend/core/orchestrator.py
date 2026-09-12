@@ -400,7 +400,7 @@ async def query_statutory_rag(state: OrchestratorState) -> OrchestratorState:
         # Call your existing RAG engine
         rag_response = await rag_engine.process_query(
             rag_query, 
-            jurisdiction_mode=JurisdictionMode.INDIA_ONLY
+            jurisdiction_mode=JurisdictionMode.INDIA
         )
         state["rag_context"] = rag_response.india_response.content if rag_response.india_response else ""
         logger.info("   ↳ Successfully retrieved grounding context from Vector DB.")

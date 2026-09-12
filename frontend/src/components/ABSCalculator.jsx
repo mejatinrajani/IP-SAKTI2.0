@@ -58,68 +58,123 @@ export default function ABSCalculator() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto w-full animate-fade-in">
-      <div className="mb-8 text-center">
-        <h2 className="text-2xl font-bold text-neutral-900">Statutory ABS Calculator</h2>
-        <p className="text-neutral-500 mt-2 text-sm">Deterministic royalty computation (BDA 2002 & 2023 Amendments)</p>
+    <div className="max-w-4xl mx-auto w-full animate-fade-in font-sans py-8 px-4 md:px-8">
+      <div className="mb-12">
+        <h2 className="text-3xl md:text-4xl font-serif font-bold text-stone-900 tracking-tight">Statutory ABS Calculator</h2>
+        <p className="text-stone-500 mt-2 text-base">Deterministic royalty computation (BDA 2002 & 2023 Amendments)</p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden mb-8">
-        <form onSubmit={handleCalculate} className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-neutral-700">Applicant Classification</label>
-              <select value={formData.applicant_type} onChange={(e) => setFormData({...formData, applicant_type: e.target.value})} className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="commercial_entity">Commercial / Corporate Entity</option>
-                <option value="registered_ayush_practitioner">Registered Ayush Practitioner (Vaidya/Hakim)</option>
-              </select>
-            </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-neutral-700">Statutory Purpose</label>
-              <select value={formData.purpose} onChange={(e) => setFormData({...formData, purpose: e.target.value})} className="p-3 bg-neutral-50 border border-neutral-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500">
-                <option value="commercial_utilization">Commercial Manufacturing (Form 9)</option>
-                <option value="ipr_licensing">IPR / Patent Licensing (Form 8)</option>
-              </select>
-            </div>
+      <form onSubmit={handleCalculate} className="mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">Applicant Classification</label>
+            <select 
+              value={formData.applicant_type} 
+              onChange={(e) => setFormData({...formData, applicant_type: e.target.value})} 
+              className="bg-transparent border-b-2 border-stone-300 py-2.5 text-lg font-medium text-stone-800 outline-none focus:border-teal-700 transition-colors cursor-pointer appearance-none"
+            >
+              <option value="commercial_entity">Commercial / Corporate Entity</option>
+              <option value="registered_ayush_practitioner">Registered Ayush Practitioner (Vaidya/Hakim)</option>
+            </select>
           </div>
+          <div className="flex flex-col gap-2">
+            <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">Statutory Purpose</label>
+            <select 
+              value={formData.purpose} 
+              onChange={(e) => setFormData({...formData, purpose: e.target.value})} 
+              className="bg-transparent border-b-2 border-stone-300 py-2.5 text-lg font-medium text-stone-800 outline-none focus:border-teal-700 transition-colors cursor-pointer appearance-none"
+            >
+              <option value="commercial_utilization">Commercial Manufacturing (Form 9)</option>
+              <option value="ipr_licensing">IPR / Patent Licensing (Form 8)</option>
+            </select>
+          </div>
+        </div>
 
-          <div className="bg-neutral-50 p-5 rounded-xl border border-neutral-200 mb-6">
-            {formData.purpose === 'commercial_utilization' ? (
+        <div className="mb-12">
+          {formData.purpose === 'commercial_utilization' ? (
+            <div className="flex flex-col gap-2 max-w-xl">
+              <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">Gross Ex-Factory Sales (INR)</label>
+              <input 
+                type="number" 
+                value={formData.gross_annual_sales_inr} 
+                onChange={(e) => setFormData({...formData, gross_annual_sales_inr: e.target.value})} 
+                placeholder="e.g. 45000000" 
+                className="bg-transparent border-b-2 border-stone-300 py-2.5 text-xl font-medium text-stone-800 outline-none focus:border-teal-700 transition-colors placeholder:text-stone-300" 
+                required 
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-2xl">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-semibold text-neutral-700">Gross Ex-Factory Sales (INR)</label>
-                <input type="number" value={formData.gross_annual_sales_inr} onChange={(e) => setFormData({...formData, gross_annual_sales_inr: e.target.value})} placeholder="e.g. 45000000" className="p-3 bg-white border border-neutral-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" required />
+                <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">Upfront Fee (INR)</label>
+                <input 
+                  type="number" 
+                  value={formData.upfront_licensing_fee_inr} 
+                  onChange={(e) => setFormData({...formData, upfront_licensing_fee_inr: e.target.value})} 
+                  placeholder="e.g. 500000"
+                  className="bg-transparent border-b-2 border-stone-300 py-2.5 text-xl font-medium text-stone-800 outline-none focus:border-teal-700 transition-colors placeholder:text-stone-300" 
+                />
               </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex flex-col gap-2"><label className="text-sm font-semibold text-neutral-700">Upfront Fee (INR)</label><input type="number" value={formData.upfront_licensing_fee_inr} onChange={(e) => setFormData({...formData, upfront_licensing_fee_inr: e.target.value})} className="p-3 bg-white border border-neutral-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" /></div>
-                <div className="flex flex-col gap-2"><label className="text-sm font-semibold text-neutral-700">Annual Royalty (INR)</label><input type="number" value={formData.annual_royalty_inr} onChange={(e) => setFormData({...formData, annual_royalty_inr: e.target.value})} className="p-3 bg-white border border-neutral-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500" /></div>
+              <div className="flex flex-col gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wider text-stone-400">Annual Royalty (INR)</label>
+                <input 
+                  type="number" 
+                  value={formData.annual_royalty_inr} 
+                  onChange={(e) => setFormData({...formData, annual_royalty_inr: e.target.value})} 
+                  placeholder="e.g. 150000"
+                  className="bg-transparent border-b-2 border-stone-300 py-2.5 text-xl font-medium text-stone-800 outline-none focus:border-teal-700 transition-colors placeholder:text-stone-300" 
+                />
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
 
-          <button type="submit" disabled={loading} className="w-full bg-neutral-900 text-white py-3.5 rounded-xl font-medium hover:bg-indigo-600 transition-colors shadow-sm disabled:opacity-50">
-            {loading ? 'Computing Liability...' : 'Calculate Liability'}
-          </button>
-        </form>
-      </div>
+        <button 
+          type="submit" 
+          disabled={loading} 
+          className="group inline-flex items-center gap-3 px-8 py-4 bg-teal-800 text-white rounded-full font-medium text-base hover:bg-teal-700 transition-all shadow-sm disabled:opacity-40 disabled:hover:bg-teal-800"
+        >
+          {loading ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+              Computing Liability...
+            </>
+          ) : (
+            <>
+              Calculate Liability
+              <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </>
+          )}
+        </button>
+      </form>
 
       {result && !error && (
-        <div className={`rounded-2xl p-6 border ${result.is_exempt ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-neutral-200 shadow-sm'}`}>
-          <div className="flex flex-col items-center text-center mb-6">
-            <span className={`text-xs font-bold uppercase tracking-wider mb-2 ${result.is_exempt ? 'text-emerald-600' : 'text-neutral-400'}`}>Mandatory Royalty Fee</span>
-            <div className={`text-4xl md:text-5xl font-black ${result.is_exempt ? 'text-emerald-700' : 'text-neutral-900'}`}>
-  {result.is_exempt 
-    ? "₹ 0" 
-    : result.calculated_abs_fee_inr === result.calculated_max_fee_inr
-      ? formatINR(result.calculated_abs_fee_inr)
-      : `${formatINR(result.calculated_abs_fee_inr)} - ${formatINR(result.calculated_max_fee_inr)}`
-  }
-</div>
-            <span className="text-sm font-medium mt-2 text-neutral-500">{result.applied_rate_description}</span>
+        <div className="animate-slide-in-up pt-12 border-t border-stone-200/60">
+          <div className="flex flex-col mb-12">
+            <span className={`text-xs font-bold uppercase tracking-widest mb-4 ${result.is_exempt ? 'text-teal-700' : 'text-stone-400'}`}>
+              Mandatory Royalty Fee
+            </span>
+            <div className={`text-5xl md:text-7xl font-serif font-bold tracking-tight ${result.is_exempt ? 'text-teal-800' : 'text-stone-900'}`}>
+              {result.is_exempt 
+                ? "₹ 0" 
+                : result.calculated_abs_fee_inr === result.calculated_max_fee_inr
+                  ? formatINR(result.calculated_abs_fee_inr)
+                  : `${formatINR(result.calculated_abs_fee_inr)} - ${formatINR(result.calculated_max_fee_inr)}`
+              }
+            </div>
+            <div className="mt-6">
+              <span className="text-sm font-medium text-stone-600 bg-stone-100 px-4 py-1.5 rounded-full border border-stone-200/60">
+                {result.applied_rate_description}
+              </span>
+            </div>
           </div>
-          <div className="space-y-3 pt-6 border-t border-neutral-200/50">
+          
+          <div className="space-y-4 max-w-2xl">
             {result.statutory_reality_check.map((check, idx) => (
-              <div key={idx} className="flex gap-3 text-sm text-neutral-700"><span className="text-indigo-500">✦</span>{check}</div>
+              <div key={idx} className="flex gap-4 text-base text-stone-600 leading-relaxed items-start">
+                <span className="text-teal-700 mt-0.5">✧</span>
+                <p>{check}</p>
+              </div>
             ))}
           </div>
         </div>

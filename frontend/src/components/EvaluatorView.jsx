@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square, Download } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, Copy, Check, ArrowUp, Mic, MicOff, Volume2, Square, Download, ShieldAlert } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useAuth } from '../context/AuthContext';
@@ -284,37 +284,50 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
   };
 
   return (
-    <div className="relative flex flex-col h-[85vh] w-full max-w-4xl mx-auto bg-white rounded-3xl border border-neutral-200 shadow-xs overflow-hidden">
+    <div className="relative flex flex-col h-full w-full max-w-6xl mx-auto font-sans text-stone-800">
+      
       {/* Message Feed */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+      <div className="flex-1 overflow-y-auto p-4 md:p-10 pt-8 md:pt-12 space-y-10 no-scrollbar">
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`group relative max-w-[85%] md:max-w-[75%] rounded-2xl px-5 py-3.5 ${
+          <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start gap-4'}`}>
+            
+            {/* Claude-style AI Avatar Icon */}
+            {msg.role === 'ai' && (
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl overflow-hidden shrink-0 mt-1">
+                <img
+                  src="/favicon.png"
+                  alt="IP"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            )}
+
+            <div className={`group relative max-w-[85%] md:max-w-[75%] ${
               msg.role === 'user' 
-                ? 'bg-neutral-900 text-white rounded-tr-xs' 
-                : 'bg-neutral-50 border border-neutral-200/70 text-neutral-800 rounded-tl-xs'
+                ? 'bg-stone-200 text-stone-900 px-6 py-4 rounded-3xl rounded-tr-sm shadow-sm' 
+                : 'bg-transparent text-stone-800 py-1.5'
             }`}>
-              <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text_content}</p>
+              <p className="text-base md:text-lg leading-relaxed whitespace-pre-wrap">{msg.text_content}</p>
 
               {/* Evaluation Dossier Card */}
               {msg.type === 'evaluation' && msg.report_data && (
-                <div className="mt-3.5 pt-3.5 border-t border-neutral-200/80">
-                  <div className="flex flex-wrap gap-1.5 mb-3">
+                <div className="mt-5 pt-4">
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {msg.report_data.extracted_plants?.map((plant, i) => (
-                      <span key={i} className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-semibold rounded-md border border-indigo-100">
+                      <span key={i} className="px-3 py-1 bg-[#F4F2EE] text-teal-800 text-sm font-medium rounded-full border border-stone-200/60">
                         {plant}
                       </span>
                     ))}
                     {msg.report_data.dmr_violation && (
-                      <span className="px-2 py-0.5 bg-red-50 text-red-700 text-xs font-semibold rounded-md border border-red-100 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                      <span className="px-3 py-1 bg-amber-50 text-amber-700 text-sm font-medium rounded-full border border-amber-200/60 flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
                         DMR Violation
                       </span>
                     )}
                   </div>
                   <button
                     onClick={() => setActiveReport(msg.report_data)}
-                    className="w-full sm:w-auto bg-neutral-900 text-white px-4 py-2 rounded-xl text-xs font-semibold hover:bg-neutral-800 transition-colors"
+                    className="w-full sm:w-auto bg-teal-800 text-white px-5 py-2.5 rounded-full text-sm font-medium hover:bg-teal-700 transition-all shadow-sm flex items-center justify-center gap-2"
                   >
                     Open Regulatory Canvas ↗
                   </button>
@@ -323,211 +336,236 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
 
               {/* Action Toolbar on AI responses */}
               {msg.role === 'ai' && (
-                <div className="flex items-center gap-1 mt-2 text-neutral-400 opacity-80 group-hover:opacity-100 transition-opacity">
+                <div className="flex items-center gap-2 mt-3 text-stone-400 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => handleSpeak(msg.report_data ? msg.report_data.final_report.content : msg.text_content)}
-                    className="p-1 hover:text-neutral-700 rounded transition-colors"
+                    className="p-1.5 hover:bg-stone-200 hover:text-stone-700 rounded-md transition-colors"
                     title={isSpeaking ? "Stop reading" : "Read aloud"}
                   >
-                    {isSpeaking ? <Square className="w-3.5 h-3.5 text-red-600" /> : <Volume2 className="w-3.5 h-3.5" />}
+                    {isSpeaking ? <Square className="w-4 h-4 text-amber-600" /> : <Volume2 className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => handleCopy(msg.id, msg.text_content)}
-                    className="p-1 hover:text-neutral-700 rounded transition-colors"
+                    className="p-1.5 hover:bg-stone-200 hover:text-stone-700 rounded-md transition-colors"
                     title="Copy text"
                   >
-                    {copiedId === msg.id ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    {copiedId === msg.id ? <Check className="w-4 h-4 text-teal-600" /> : <Copy className="w-4 h-4" />}
                   </button>
                   <button
                     onClick={() => handleFeedback(msg.id, msg.feedback === 'like' ? 'none' : 'like')}
-                    className={`p-1 rounded transition-colors ${msg.feedback === 'like' ? 'text-indigo-600' : 'hover:text-neutral-700'}`}
-                    title="Helpful"
+                    className={`p-1.5 rounded-md transition-colors ${msg.feedback === 'like' ? 'text-teal-600 bg-teal-50' : 'hover:bg-stone-200 hover:text-stone-700'}`}
                   >
-                    <ThumbsUp className="w-3.5 h-3.5" />
+                    <ThumbsUp className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleFeedback(msg.id, msg.feedback === 'dislike' ? 'none' : 'dislike')}
-                    className={`p-1 rounded transition-colors ${msg.feedback === 'dislike' ? 'text-red-600' : 'hover:text-neutral-700'}`}
-                    title="Not helpful"
+                    className={`p-1.5 rounded-md transition-colors ${msg.feedback === 'dislike' ? 'text-amber-600 bg-amber-50' : 'hover:bg-stone-200 hover:text-stone-700'}`}
                   >
-                    <ThumbsDown className="w-3.5 h-3.5" />
+                    <ThumbsDown className="w-4 h-4" />
                   </button>
                 </div>
               )}
             </div>
           </div>
         ))}
+        
         {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-neutral-50 border border-neutral-200/70 rounded-2xl rounded-tl-xs px-4 py-3 flex gap-1.5 items-center">
-              <div className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce" />
-              <div className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:0.2s]" />
-              <div className="w-1.5 h-1.5 bg-neutral-400 rounded-full animate-bounce [animation-delay:0.4s]" />
+          <div className="flex justify-start gap-4">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl overflow-hidden shrink-0 mt-1 shadow-sm">
+              <img src="/favicon.png" alt="IP" className="w-full h-full object-cover" />
+            </div>
+            <div className="bg-transparent py-4 flex gap-2 items-center">
+              <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce" />
+              <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce [animation-delay:0.2s]" />
+              <div className="w-2 h-2 bg-stone-400 rounded-full animate-bounce [animation-delay:0.4s]" />
             </div>
           </div>
         )}
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input Form */}
-      <div className="p-3 border-t border-neutral-100 bg-white">
-        <form onSubmit={handleSend} className="relative flex items-center bg-neutral-50 rounded-2xl border border-neutral-200/90 px-3 py-1.5 focus-within:ring-2 focus-within:ring-neutral-900/10 focus-within:border-neutral-900 transition-all">
+      {/* Input Form - Pure Single Line Fill-in-the-Blank */}
+      <div className="shrink-0 px-4 md:px-10 pb-6 md:pb-8 pt-2">
+        <form
+          onSubmit={handleSend}
+          className="flex items-center w-full border-b-2 border-stone-300 focus-within:border-teal-700 transition-colors pb-2"
+        >
           <input
             type="text"
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
-              
-              if (isListening && recognitionRef.current) {
-                recognitionRef.current.stop();
-              }
+              if (isListening && recognitionRef.current) recognitionRef.current.stop();
             }}
             placeholder="Type your formulation details or ask a regulatory question..."
             disabled={isLoading}
-            className="flex-1 bg-transparent px-2 py-2 text-sm text-neutral-800 outline-none placeholder-neutral-400"
+            className="flex-1 bg-transparent border-none px-2 py-2 text-base md:text-lg text-stone-800 outline-none placeholder-stone-400"
           />
-          <button
-            type="button"
-            onClick={toggleListening}
-            className={`p-2 rounded-xl transition-all mr-1 ${
-              isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-neutral-500 hover:bg-neutral-200'
-            }`}
-            title="Dictate prompt"
-          >
-            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-          </button>
-          <button
-            type="submit"
-            disabled={isLoading || !query.trim()}
-            className="p-2 bg-neutral-900 text-white rounded-xl hover:bg-neutral-800 disabled:opacity-20 transition-all ml-1"
-          >
-            <ArrowUp className="w-4 h-4" />
-          </button>
+
+          <div className="flex items-center shrink-0 gap-1">
+            <button
+              type="button"
+              onClick={toggleListening}
+              className={`p-2 rounded-full transition-all ${
+                isListening
+                  ? 'text-amber-600 animate-pulse bg-amber-50'
+                  : 'text-stone-400 hover:text-stone-600 hover:bg-stone-100'
+              }`}
+            >
+              {isListening ? (
+                <MicOff className="w-5 h-5" />
+              ) : (
+                <Mic className="w-5 h-5" />
+              )}
+            </button>
+
+            <button
+              type="submit"
+              disabled={isLoading || !query.trim()}
+              className="p-2 text-teal-800 hover:text-teal-600 disabled:opacity-30 hover:bg-teal-50 rounded-full transition-all flex items-center justify-center"
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`w-5 h-5 transition-transform duration-300 ${
+                  query.trim() && !isLoading
+                    ? 'hover:translate-x-1 hover:-translate-y-1'
+                    : ''
+                }`}
+              >
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
         </form>
       </div>
 
-      {/* Dossier Canvas Side Panel */}
+      {/* Expanded Claude-Style Canvas Dossier (Ultra-Wide & Borderless Content) */}
       {activeReport && (
-        <div className="absolute inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/20 backdrop-blur-xs" onClick={() => setActiveReport(null)} />
-          <div className="relative w-full md:w-3/4 bg-white h-full shadow-2xl flex flex-col border-l border-neutral-200 animate-slide-in-right">
+        <div className="absolute inset-0 z-50 flex justify-end overflow-hidden">
+          <div className="absolute inset-0 bg-stone-900/20 backdrop-blur-sm transition-opacity" onClick={() => setActiveReport(null)} />
+          
+          {/* Canvas Window - Increased width significantly */}
+          <div className="relative w-full md:w-[85%] lg:w-[80%] bg-white h-full shadow-2xl flex flex-col animate-slide-in-right rounded-l-2xl border-l border-stone-200/60 overflow-hidden">
             
-            <div className="flex justify-between items-center px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
-              <div>
-                <h3 className="text-base font-bold text-neutral-900">Statutory Dossier Canvas</h3>
-                <p className="text-xs text-neutral-500">Ministry of Ayush Regulatory Synthesis</p>
+            <div className="flex justify-between items-center px-6 py-4 border-b border-stone-200/80 bg-stone-50/50 z-10 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-teal-50 flex items-center justify-center text-teal-700">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-stone-900">Regulatory Canvas</h3>
+                  <p className="text-[11px] text-stone-500 uppercase tracking-widest">Ministry of Ayush Synthesis</p>
+                </div>
               </div>
               
-              {/* Jurisdiction Toggle */}
-              <div className="flex bg-neutral-200/70 p-1 rounded-xl mx-4">
-                <button
-                  onClick={() => setJurisdiction('national')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    jurisdiction === 'national' ? 'bg-white text-neutral-900 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  🇮🇳 National
-                </button>
-                <button
-                  onClick={() => setJurisdiction('international')}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-all ${
-                    jurisdiction === 'international' ? 'bg-white text-indigo-700 shadow-sm' : 'text-neutral-600 hover:text-neutral-900'
-                  }`}
-                >
-                  🌐 International
-                </button>
-              </div>
+              <div className="flex items-center gap-4">
+                <div className="flex bg-stone-200/60 p-1 rounded-lg">
+                  <button
+                    onClick={() => setJurisdiction('national')}
+                    className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                      jurisdiction === 'national' ? 'bg-white text-teal-800 shadow-sm' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    National
+                  </button>
+                  <button
+                    onClick={() => setJurisdiction('international')}
+                    className={`px-4 py-1.5 text-xs font-medium rounded-md transition-all ${
+                      jurisdiction === 'international' ? 'bg-white text-teal-800 shadow-sm' : 'text-stone-500 hover:text-stone-800'
+                    }`}
+                  >
+                    International
+                  </button>
+                </div>
 
-              <div className="flex items-center gap-2">
-                {/* PDF Download Button */}
+                <div className="h-6 w-px bg-stone-200 hidden sm:block"></div>
+
                 <button 
                   onClick={handleDownloadPDF}
                   disabled={isGeneratingPDF}
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-colors text-xs font-semibold disabled:opacity-50"
+                  className="hidden sm:flex items-center justify-center w-8 h-8 rounded-md hover:bg-stone-100 text-stone-600 hover:text-stone-900 transition-colors disabled:opacity-50"
                   title="Save as PDF"
                 >
                   <Download className="w-4 h-4" />
-                  {isGeneratingPDF ? 'Opening...' : 'Save PDF'}
                 </button>
 
                 <button 
                   onClick={() => setActiveReport(null)}
-                  className="w-8 h-8 flex items-center justify-center rounded-lg bg-neutral-100 hover:bg-neutral-200 text-neutral-600 transition-colors text-sm font-semibold"
+                  className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-stone-100 text-stone-500 hover:text-stone-800 transition-colors"
                 >
                   ✕
                 </button>
               </div>
-          </div>
+            </div>
             
-            {/* 1. SCROLLING CONTAINER: Removed the ref from here and added a gray background */}
-            <div className="p-6 overflow-y-auto flex-1 bg-neutral-100">
-              
-              {/* 2. THE PDF "PAPER" CONTAINER: Attached the ref here so it has no scroll limits */}
-              <div ref={dossierRef} className="bg-white p-4 md:p-8 rounded-sm shadow-sm">
+            {/* Canvas Scroll Area - Pure white, no inner card, full width text */}
+            <div className="flex-1 overflow-y-auto bg-white p-8 md:p-16 lg:p-20 no-scrollbar">
+              <div ref={dossierRef} className="w-full max-w-6xl mx-auto min-h-full">
                 
-                {/* 3. PDF HEADER: Prints nicely at the top of the downloaded document */}
-                <div className="mb-6 pb-4 border-b border-neutral-200">
-                  <h2 className="text-xl font-bold text-neutral-900">IP-SAKTI 2.0 Clearance Dossier</h2>
-                  <p className="text-sm text-neutral-500">
-                    Jurisdiction: {jurisdiction === 'national' ? 'India (AYUSH/CDSCO)' : 'Global Export'}
+                <div className="mb-10 pb-8 border-b border-stone-100">
+                  <h2 className="text-3xl md:text-4xl font-serif text-stone-900">IP-SAKTI Clearance</h2>
+                  <p className="text-base text-stone-500 mt-3">
+                    Jurisdiction Target: <strong className="text-stone-700">{jurisdiction === 'national' ? 'India (AYUSH/CDSCO)' : 'Global Export'}</strong>
                   </p>
                 </div>
 
-                <MarkdownRenderer 
-                  content={
-                    jurisdiction === 'national' 
-                      ? (activeReport.final_report?.national_content || activeReport.final_report?.content) 
-                      : (activeReport.final_report?.international_content || 'No international dossier generated for this query.')
-                  } 
-                />
+                <div className="prose prose-stone max-w-none prose-p:leading-relaxed prose-headings:font-serif">
+                  <MarkdownRenderer 
+                    content={
+                      jurisdiction === 'national' 
+                        ? (activeReport.final_report?.national_content || activeReport.final_report?.content) 
+                        : (activeReport.final_report?.international_content || 'No international dossier generated for this query.')
+                    } 
+                  />
+                </div>
                 
-                {/* DYNAMIC AI Audit & Provenance Footer */}
                 {activeReport.audit_metrics && (
-                  <div className="mt-8 pt-4 border-t border-neutral-200 bg-neutral-50 rounded-xl p-4">
-                    <h4 className="text-xs font-bold text-neutral-700 uppercase tracking-wider mb-3">
-                      AI Audit & Traceability Report
+                  <div className="mt-16 pt-8 border-t border-stone-200 bg-stone-50/50 rounded-xl p-8">
+                    <h4 className="text-xs font-semibold text-stone-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                      <ShieldAlert className="w-4 h-4" /> Audit & Traceability
                     </h4>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Groundedness Metric */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-neutral-500 uppercase">Statutory Faithfulness</span>
-                        <div className="flex items-center gap-2 mt-1">
-                          <div className="w-full bg-neutral-200 rounded-full h-1.5">
+                        <span className="text-[10px] text-stone-400 uppercase tracking-wider">Statutory Faithfulness</span>
+                        <div className="flex items-center gap-3 mt-2.5">
+                          <div className="flex-1 bg-stone-200 rounded-full h-1.5">
                             <div 
-                              className={`h-1.5 rounded-full ${activeReport.audit_metrics.groundedness_score >= 90 ? 'bg-emerald-500' : 'bg-amber-500'}`} 
+                              className={`h-1.5 rounded-full ${activeReport.audit_metrics.groundedness_score >= 90 ? 'bg-teal-600' : 'bg-amber-500'}`} 
                               style={{ width: `${activeReport.audit_metrics.groundedness_score}%` }}
                             ></div>
                           </div>
-                          <span className={`text-xs font-bold ${activeReport.audit_metrics.groundedness_score >= 90 ? 'text-emerald-700' : 'text-amber-700'}`}>
+                          <span className={`text-sm font-semibold ${activeReport.audit_metrics.groundedness_score >= 90 ? 'text-teal-700' : 'text-amber-700'}`}>
                             {activeReport.audit_metrics.groundedness_score}%
                           </span>
                         </div>
-                        <span className="text-[10px] text-neutral-400 mt-1">Dynamic LLM-as-a-Judge Score</span>
                       </div>
 
-                      {/* Knowledge Limit / Confidence */}
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-neutral-500 uppercase">Data Completeness</span>
-                        <span className={`text-xs font-bold mt-1 flex items-center gap-1 ${
-                          activeReport.audit_metrics.confidence === 'High' ? 'text-emerald-600' : 'text-amber-600'
+                        <span className="text-[10px] text-stone-400 uppercase tracking-wider">Data Completeness</span>
+                        <span className={`text-sm font-medium mt-2 flex items-center gap-2 ${
+                          activeReport.audit_metrics.confidence === 'High' ? 'text-teal-700' : 'text-amber-600'
                         }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            activeReport.audit_metrics.confidence === 'High' ? 'bg-emerald-500' : 'bg-amber-500'
+                          <span className={`w-2 h-2 rounded-full ${
+                            activeReport.audit_metrics.confidence === 'High' ? 'bg-teal-500' : 'bg-amber-500'
                           }`}></span>
                           {activeReport.audit_metrics.confidence}
                         </span>
-                        <span className="text-[10px] text-neutral-400 mt-1 line-clamp-1" title={activeReport.audit_metrics.completeness}>
-                          {activeReport.audit_metrics.completeness}
-                        </span>
                       </div>
 
-                      {/* Provenance / Audit Trail */}
                       <div className="flex flex-col">
-                        <span className="text-[10px] text-neutral-500 uppercase">Verification Sources</span>
-                        <div className="flex flex-wrap gap-1 mt-1">
+                        <span className="text-[10px] text-stone-400 uppercase tracking-wider">Verification Sources</span>
+                        <div className="flex flex-wrap gap-2 mt-2">
                           {activeReport.audit_metrics.sources?.map((source, idx) => (
-                            <span key={idx} className="text-[9px] px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded">
+                            <span key={idx} className="text-[11px] px-3 py-1 bg-white border border-stone-200 text-stone-700 rounded-md font-medium shadow-sm">
                               {source}
                             </span>
                           ))}
