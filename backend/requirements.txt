@@ -17,7 +17,6 @@ langgraph
 
 # Databases (Vector, Graph, Relational)
 chromadb
-sentence-transformers
 neo4j
 supabase
 

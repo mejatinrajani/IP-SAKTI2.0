@@ -1,13 +1,13 @@
 import os
 import logging
 from typing import List, Dict, Any
+from dotenv import load_dotenv
 import chromadb
 from chromadb.config import Settings
-from chromadb.utils import embedding_functions
+from chromadb.utils import embedding_functions 
 
+load_dotenv()
 logger = logging.getLogger("VECTOR_STORE")
-
-# Persist the vector database locally inside backend/data/chroma_db
 DB_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "chroma_db")
 
 class LegalVectorStore:
@@ -15,9 +15,14 @@ class LegalVectorStore:
         os.makedirs(DB_DIR, exist_ok=True)
         self.client = chromadb.PersistentClient(path=DB_DIR)
         
-        # Fast, dense local embedding model
-        self.embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="all-MiniLM-L6-v2"
+        hf_token = os.getenv("HF_API_TOKEN")
+        if not hf_token:
+            logger.error("Missing HF_API_TOKEN! Embeddings will fail.")
+
+        # 🚀 THE FIX: Offload the heavy model to Hugging Face's free cloud API
+        self.embedding_fn = embedding_functions.HuggingFaceEmbeddingFunction(
+            api_key=hf_token,
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
         )
         
         # 1. Indian Statutory Corpus Collection
