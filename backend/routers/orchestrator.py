@@ -4,8 +4,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Any, List, Dict
 from pydantic import BaseModel, Field
 import json
-# Import existing core engines
-from core.sarvam_client import sarvam_client as bhashini_client
+from core.bhashini_client import bhashini_client
 from core.agentic_classifier import agentic_wizard
 from core.dpdp_masker import dpdp_masker
 from core.dual_rag_engine import rag_engine

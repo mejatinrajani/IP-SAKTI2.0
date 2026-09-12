@@ -555,9 +555,6 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                   const element = printRef.current;
                   if (!element) return;
                   
-                  // Temporarily make it visible for printing
-                  element.style.display = 'block';
-                  
                   const opt = {
                     margin:       15,
                     filename:     'Regulatory_Dossier.pdf',
@@ -567,10 +564,7 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
                     pagebreak:    { mode: 'css', avoid: ['tr', 'h1', 'h2', 'h3', 'h4', 'p', 'li', '.avoid-break'] }
                   };
                   
-                  html2pdf().set(opt).from(element).save().then(() => {
-                    // Hide it again
-                    element.style.display = 'none';
-                  });
+                  html2pdf().set(opt).from(element).save();
                 }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors"
                 style={{ background: 'var(--color-base-navy-panel)', color: '#FFFFFF', border: '1px solid transparent' }}
@@ -709,16 +703,18 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
           </div>
 
           {/* Hidden Container for PDF Export */}
-          <div 
-            ref={printRef} 
-            className="w-full max-w-none bg-white p-8" 
-            style={{ display: 'none', color: '#000' }}
-          >
-            <div className="mb-6 border-b border-gray-200 pb-4">
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">IP-SAKTI 2.0 Regulatory Dossier</h1>
-              <p className="text-sm text-gray-500">Ministry of Ayush Regulatory Synthesis - {new Date().toLocaleDateString()}</p>
+          <div style={{ position: 'absolute', top: '-9999px', left: '-9999px', width: '800px', pointerEvents: 'none' }}>
+            <div 
+              ref={printRef} 
+              className="w-full max-w-none bg-white p-8" 
+              style={{ color: '#000' }}
+            >
+              <div className="mb-6 border-b border-gray-200 pb-4">
+                <h1 className="text-2xl font-bold text-gray-900 mb-1">IP-SAKTI 2.0 Regulatory Dossier</h1>
+                <p className="text-sm text-gray-500">Ministry of Ayush Regulatory Synthesis - {new Date().toLocaleDateString()}</p>
+              </div>
+              <MarkdownRenderer content={activeReport.final_report?.content} isDark={false} />
             </div>
-            <MarkdownRenderer content={activeReport.final_report?.content} isDark={false} />
           </div>
         </div>
       )}

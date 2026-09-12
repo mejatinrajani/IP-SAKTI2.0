@@ -79,7 +79,7 @@ supabase: Client = create_client(os.getenv("SUPABASE_URL"), os.getenv("SUPABASE_
 NEO4J_URI = os.getenv("NEO4J_URI", "neo4j://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
-NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "sih2026")
+NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 # Structured & Standard LLM instances via Groq
@@ -211,7 +211,7 @@ async def query_neo4j_regulatory(state: OrchestratorState) -> OrchestratorState:
            labels(target)[0] AS target_label
     """
     try:
-        with driver.session(database=NEO4J_DATABASE) as session:
+        with driver.session() as session:
             result = session.run(query, plants=plants, target_nba_form=target_nba_form)
             for record in result:
                 regulatory_data.append({

@@ -135,7 +135,7 @@ def main():
 
     # 2. Execute Graph Transactions
     try:
-        with driver.session(database=NEO4J_DATABASE) as session:
+        with driver.session() as session:
             logger.info(f"Connected to database: {NEO4J_DATABASE}")
             # Seed the immutable legal frameworks
             logger.info("🏛️ Seeding statutory Authorities, Acts, and CDSCO/NBA Forms...")
@@ -154,7 +154,7 @@ def main():
         logger.info("✅ KNOWLEDGE GRAPH ONTOLOGY SEEDING COMPLETE.")
         
         # 3. Verification check (split to prevent subquery streaming warning)
-        with driver.session(database=NEO4J_DATABASE) as session:
+        with driver.session() as session:
             total_nodes = session.run("MATCH (n) RETURN count(n) AS c").single()["c"]
             total_rels = session.run("MATCH ()-[r]->() RETURN count(r) AS c").single()["c"]
             

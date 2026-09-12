@@ -14,7 +14,19 @@ const SARVAM_LANGUAGES = [
   { code: 'kn', label: 'Kannada (ಕನ್ನಡ)' },
   { code: 'ml', label: 'Malayalam (മലയാളം)' },
   { code: 'pa', label: 'Punjabi (ਪੰਜਾਬੀ)' },
-  { code: 'or', label: 'Odia (ଓଡ଼ିଆ)' }
+  { code: 'or', label: 'Odia (ଓଡ଼ିଆ)' },
+  { code: 'as', label: 'Assamese (অসমীয়া)' },
+  { code: 'ur', label: 'Urdu (اردو)' },
+  { code: 'sa', label: 'Sanskrit (संस्कृतम्)' },
+  { code: 'mai', label: 'Maithili (मैथिली)' },
+  { code: 'brx', label: 'Bodo (बड़ो)' },
+  { code: 'doi', label: 'Dogri (डोगरी)' },
+  { code: 'ks', label: 'Kashmiri (कॉशुर)' },
+  { code: 'gom', label: 'Konkani (कोंकणी)' },
+  { code: 'mni', label: 'Manipuri (মৈতৈলোন্)' },
+  { code: 'ne', label: 'Nepali (नेपाली)' },
+  { code: 'sat', label: 'Santali (ᱥᱟᱱᱛᱟᱲᱤ)' },
+  { code: 'sd', label: 'Sindhi (سنڌي)' }
 ];
 
 export default function Navbar({ mainView, setMainView, language, setLanguage, isSidebarOpen, setIsSidebarOpen, onNewChat }) {

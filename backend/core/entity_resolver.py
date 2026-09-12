@@ -162,7 +162,7 @@ class EntityResolver:
         search_term = f"{cleaned}~0.7"
         
         try:
-            with self.driver.session(database=NEO4J_DATABASE) as session:
+            with self.driver.session() as session:
                 result = session.run(fuzzy_query, search_term=search_term).single()
                 if result and result["score"] >= 0.5:
                     matched_name = result["botanical_name"]
@@ -180,7 +180,7 @@ class EntityResolver:
         LIMIT 1
         """
         try:
-            with self.driver.session(database=NEO4J_DATABASE) as session:
+            with self.driver.session() as session:
                 result = session.run(fallback_query, name=cleaned).single()
                 if result:
                     matched_name = result["botanical_name"]

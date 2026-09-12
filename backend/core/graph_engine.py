@@ -44,7 +44,7 @@ class KnowledgeGraphEngine:
 
         results = []
         try:
-            async with self.driver.session(database=self.database) as session:
+            async with self.driver.session() as session:
                 record_res = await session.run(query, formulation_id=formulation_id)
                 records = await record_res.data()
                 for record in records:
