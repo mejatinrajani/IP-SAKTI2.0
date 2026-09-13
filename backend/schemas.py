@@ -59,7 +59,7 @@ class DualRAGResponse(BaseModel):
     query: str
     india_response: JurisdictionAnswer
     international_response: Optional[JurisdictionAnswer] = None
-    audit_id: str
+    audit_id: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.utcnow)
     disclaimer: str = "Statutory information only. Does not constitute formal legal counsel under the Advocates Act, 1961."
 
