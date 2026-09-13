@@ -32,16 +32,19 @@ async def system_health_check():
         "citation_validator_rules": 56
     }
 
-@app.get("/health", status_code=200)
-async def health_check():
+@app.get("/health", tags=["System"], status_code=200)
+async def system_health_check():
     """
     Health check endpoint to verify that the FastAPI backend is online 
     and responsive for Render deployment monitors.
     """
     return {
-        "status": "online",
+        "status": "HEALTHY",
         "service": "IP-SAKTI Legal AI Backend",
-        "environment": "production"
+        "engine": "IP-SAKTI 2.0",
+        "environment": "production",
+        "jurisdiction_isolation": "ACTIVE",
+        "citation_validator_rules": 56
     }
 if __name__ == "__main__":
     import uvicorn
