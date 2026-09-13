@@ -28,3 +28,5 @@ langchain-groq
 langchain-core
 langgraph
 langchain-openai
+
+fastembed

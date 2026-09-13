@@ -1652,7 +1652,9 @@ def run_ingestion():
     client = chromadb.PersistentClient(path=DB_DIR)
     
     # Use Chroma's built-in fast dense embedding model
-    embedding_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    
+    from core.vector_store import CustomFastEmbedFunction
+    embedding_fn = CustomFastEmbedFunction(model_name="BAAI/bge-small-en-v1.5")
     
     # 1. INDIA COLLECTION
     india_collection = client.get_or_create_collection(name="india_statutes", embedding_function=embedding_fn)

@@ -1,12 +1,11 @@
 import os
-import time
 import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-import requests
 import chromadb
 from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
+from fastembed import TextEmbedding
 
 logger = logging.getLogger("VECTOR_STORE")
 
@@ -28,53 +27,18 @@ else:
 DB_DIR = str(BACKEND_DIR / "data" / "chroma_db")
 
 
-class CustomHuggingFaceEmbeddingFunction(EmbeddingFunction):
+class CustomFastEmbedFunction(EmbeddingFunction):
     """
-    Custom HTTP embedding function targeting Hugging Face's Inference API directly.
-    Bypasses standard library restrictions and forces robust session handling.
+    Custom wrapper to run FastEmbed locally via ONNX and feed it into ChromaDB.
     """
-    def __init__(self, api_key: str, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
-        self.api_key = api_key
-        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
-        self.session = requests.Session()
-        if self.api_key:
-            self.session.headers.update({"Authorization": f"Bearer {self.api_key}"})
+    def __init__(self, model_name: str = "BAAI/bge-small-en-v1.5"):
+        self.model = TextEmbedding(model_name=model_name)
 
     def __call__(self, input: Documents) -> Embeddings:
-        payload = {
-            "inputs": input,
-            "options": {"wait_for_model": True}
-        }
-        
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                response = self.session.post(self.api_url, json=payload, timeout=30)
-                
-                # Handle HF model loading state (status 503)
-                if response.status_code == 503:
-                    logger.warning("HF model is loading into memory, retrying in 3 seconds...")
-                    time.sleep(3)
-                    continue
-                    
-                response.raise_for_status()
-                result = response.json()
-                
-                # Validate response structure
-                if isinstance(result, list):
-                    return result
-                elif isinstance(result, dict) and "error" in result:
-                    raise Exception(f"HF API returned error: {result['error']}")
-                
-                return result
-                
-            except Exception as e:
-                logger.warning(f"Custom embedding HTTP attempt {attempt + 1} failed: {e}")
-                if attempt == max_retries - 1:
-                    logger.error("All Hugging Face custom embedding requests failed.")
-                    raise e
-                time.sleep(2)
-        return []
+        # FastEmbed returns a generator of numpy arrays.
+        # ChromaDB requires a Python list of lists.
+        embeddings = list(self.model.embed(input))
+        return [emb.tolist() for emb in embeddings]
 
 
 class LegalVectorStore:
@@ -82,15 +46,9 @@ class LegalVectorStore:
         os.makedirs(DB_DIR, exist_ok=True)
         self.client = chromadb.PersistentClient(path=DB_DIR)
 
-        hf_token = os.getenv("HF_API_TOKEN") or os.getenv("CHROMA_HUGGINGFACE_API_KEY")
-        if not hf_token:
-            logger.error("Missing HF_API_TOKEN! Embeddings will fail.")
-            hf_token = ""
-
-        # Use the custom HTTP embedding class
-        self.embedding_fn = CustomHuggingFaceEmbeddingFunction(
-            api_key=hf_token,
-            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        # 🚀 Initialize our custom FastEmbed wrapper
+        self.embedding_fn = CustomFastEmbedFunction(
+            model_name="BAAI/bge-small-en-v1.5"
         )
 
         self.india_collection = self.client.get_or_create_collection(
