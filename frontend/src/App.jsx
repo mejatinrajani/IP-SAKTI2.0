@@ -75,6 +75,8 @@ function MainLayout() {
         onUpdateTitle={handleUpdateTitle}
         onTogglePin={handleTogglePin}
         onDeleteChat={handleDeleteChat}
+        mainView={mainView}
+        setMainView={setMainView}
       />
 
       <div className="flex-1 flex flex-col h-full overflow-hidden bg-white">
