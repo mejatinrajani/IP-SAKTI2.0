@@ -4,20 +4,16 @@ import logging
 from pathlib import Path
 from typing import List, Dict, Any
 from dotenv import load_dotenv
+import requests
 import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
+from chromadb.api.types import EmbeddingFunction, Documents, Embeddings
 
-# Configure logging
 logger = logging.getLogger("VECTOR_STORE")
 
-# ==========================================
-# 1. BULLETPROOF ENVIRONMENT LOADING
-# ==========================================
-# Compute absolute paths regardless of where uvicorn is executed
-CURRENT_DIR = Path(__file__).resolve().parent          # backend/core/
-BACKEND_DIR = CURRENT_DIR.parent                      # backend/
-PROJECT_ROOT = BACKEND_DIR.parent                     # project root /
+# Load environment variables path-agnostically
+CURRENT_DIR = Path(__file__).resolve().parent
+BACKEND_DIR = CURRENT_DIR.parent
+PROJECT_ROOT = BACKEND_DIR.parent
 
 env_file_backend = BACKEND_DIR / ".env"
 env_file_root = PROJECT_ROOT / ".env"
@@ -27,47 +23,82 @@ if env_file_backend.exists():
 elif env_file_root.exists():
     load_dotenv(dotenv_path=env_file_root, override=True)
 else:
-    load_dotenv(override=True)  # Fallback for Render environment variables
+    load_dotenv(override=True)
 
-# ==========================================
-# 2. VECTOR DATABASE CONFIGURATION
-# ==========================================
 DB_DIR = str(BACKEND_DIR / "data" / "chroma_db")
+
+
+class CustomHuggingFaceEmbeddingFunction(EmbeddingFunction):
+    """
+    Custom HTTP embedding function targeting Hugging Face's Inference API directly.
+    Bypasses standard library restrictions and forces robust session handling.
+    """
+    def __init__(self, api_key: str, model_name: str = "sentence-transformers/all-MiniLM-L6-v2"):
+        self.api_key = api_key
+        self.api_url = f"https://api-inference.huggingface.co/pipeline/feature-extraction/{model_name}"
+        self.session = requests.Session()
+        if self.api_key:
+            self.session.headers.update({"Authorization": f"Bearer {self.api_key}"})
+
+    def __call__(self, input: Documents) -> Embeddings:
+        payload = {
+            "inputs": input,
+            "options": {"wait_for_model": True}
+        }
+        
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = self.session.post(self.api_url, json=payload, timeout=30)
+                
+                # Handle HF model loading state (status 503)
+                if response.status_code == 503:
+                    logger.warning("HF model is loading into memory, retrying in 3 seconds...")
+                    time.sleep(3)
+                    continue
+                    
+                response.raise_for_status()
+                result = response.json()
+                
+                # Validate response structure
+                if isinstance(result, list):
+                    return result
+                elif isinstance(result, dict) and "error" in result:
+                    raise Exception(f"HF API returned error: {result['error']}")
+                
+                return result
+                
+            except Exception as e:
+                logger.warning(f"Custom embedding HTTP attempt {attempt + 1} failed: {e}")
+                if attempt == max_retries - 1:
+                    logger.error("All Hugging Face custom embedding requests failed.")
+                    raise e
+                time.sleep(2)
+        return []
 
 
 class LegalVectorStore:
     def __init__(self):
-        # Ensure the data directory exists
         os.makedirs(DB_DIR, exist_ok=True)
-        
         self.client = chromadb.PersistentClient(path=DB_DIR)
 
-        # 🚀 Fetch Hugging Face API key robustly (Checks both common variable names)
         hf_token = os.getenv("HF_API_TOKEN") or os.getenv("CHROMA_HUGGINGFACE_API_KEY")
-        
         if not hf_token:
-            logger.error("Missing HF_API_TOKEN or CHROMA_HUGGINGFACE_API_KEY! RAG will fail.")
-            # Set to empty string to prevent Chroma from throwing a fatal ValueError on boot
+            logger.error("Missing HF_API_TOKEN! Embeddings will fail.")
             hf_token = ""
 
-        # Offload the heavy model to Hugging Face's free cloud API
-        try:
-            self.embedding_fn = embedding_functions.HuggingFaceEmbeddingFunction(
-                api_key=hf_token,
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-            )
-        except Exception as e:
-            logger.error(f"Failed to initialize HuggingFaceEmbeddingFunction: {e}")
-            self.embedding_fn = None
+        # Use the custom HTTP embedding class
+        self.embedding_fn = CustomHuggingFaceEmbeddingFunction(
+            api_key=hf_token,
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
 
-        # 1. Indian Statutory Corpus Collection
         self.india_collection = self.client.get_or_create_collection(
             name="india_statutes",
             embedding_function=self.embedding_fn,
             metadata={"hnsw:space": "cosine"}
         )
 
-        # 2. International Treaties & IP Corpus Collection
         self.intl_collection = self.client.get_or_create_collection(
             name="international_treaties",
             embedding_function=self.embedding_fn,
@@ -75,54 +106,31 @@ class LegalVectorStore:
         )
 
     def query(self, query_text: str, namespace: str = "india", n_results: int = 4) -> List[Dict[str, Any]]:
-        """
-        Executes semantic vector search against the isolated jurisdictional collection.
-        Includes built-in retry logic to survive Render Free Tier DNS drops.
-        """
-        if not self.embedding_fn:
-            logger.error("Embedding function is offline. Cannot query vector store.")
-            return []
-
         collection = self.india_collection if namespace == "india" else self.intl_collection
         
-        max_retries = 3
-        for attempt in range(max_retries):
-            try:
-                results = collection.query(
-                    query_texts=[query_text],
-                    n_results=n_results
-                )
+        try:
+            results = collection.query(
+                query_texts=[query_text],
+                n_results=n_results
+            )
 
-                retrieved_chunks = []
-                
-                # Safely parse results
-                if results and results.get("documents") and len(results["documents"]) > 0:
-                    documents = results["documents"][0]
-                    metadatas = results.get("metadatas", [[]])[0]
-                    
-                    # Ensure metadata matches document length to prevent zip failures
-                    if not metadatas:
-                        metadatas = [{}] * len(documents)
+            retrieved_chunks = []
+            if results and results.get("documents") and len(results["documents"]) > 0:
+                documents = results["documents"][0]
+                metadatas = results.get("metadatas", [[]])[0]
+                if not metadatas:
+                    metadatas = [{}] * len(documents)
 
-                    for doc, meta in zip(documents, metadatas):
-                        retrieved_chunks.append({
-                            "text": doc,
-                            "statute": meta.get("statute", "Unknown"),
-                            "section": meta.get("section", "General"),
-                            "jurisdiction": meta.get("jurisdiction", namespace)
-                        })
-                
-                # Return successfully parsed chunks
-                return retrieved_chunks
-                
-            except Exception as e:
-                logger.warning(f"Vector search attempt {attempt + 1} failed: {e}")
-                if attempt == max_retries - 1:
-                    logger.error(f"Final vector search failure for namespace '{namespace}': {e}")
-                    return []
-                
-                # Wait before retrying (Exponential backoff for DNS recovery)
-                time.sleep(1.5 * (attempt + 1))
+                for doc, meta in zip(documents, metadatas):
+                    retrieved_chunks.append({
+                        "text": doc,
+                        "statute": meta.get("statute", "Unknown"),
+                        "section": meta.get("section", "General"),
+                        "jurisdiction": meta.get("jurisdiction", namespace)
+                    })
+            return retrieved_chunks
+        except Exception as e:
+            logger.error(f"Vector search failed for namespace '{namespace}': {e}")
+            return []
 
-# Initialize a singleton instance to be used across the application
 vector_store = LegalVectorStore()
