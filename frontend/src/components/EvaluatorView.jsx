@@ -390,16 +390,20 @@ export default function EvaluatorView({ language, activeChatId, onFirstMessageSe
           onSubmit={handleSend}
           className="flex items-center w-full border-b-2 border-stone-300 focus-within:border-teal-700 transition-colors pb-2"
         >
-          <input
-            type="text"
+          <textarea
             value={query}
             onChange={(e) => {
               setQuery(e.target.value);
               if (isListening && recognitionRef.current) recognitionRef.current.stop();
+              
+              // This makes the textarea grow dynamically as the user types
+              e.target.style.height = 'auto';
+              e.target.style.height = `${e.target.scrollHeight}px`;
             }}
             placeholder="Type your formulation details or ask a regulatory question..."
             disabled={isLoading}
-            className="flex-1 bg-transparent border-none px-2 py-2 text-base md:text-lg text-stone-800 outline-none placeholder-stone-400"
+            rows={1}
+            className="flex-1 bg-transparent border-none px-2 py-2 text-base md:text-lg text-stone-800 outline-none placeholder-stone-400 resize-none w-full max-h-32 overflow-y-auto self-end"
           />
 
           <div className="flex items-center shrink-0 gap-1">
