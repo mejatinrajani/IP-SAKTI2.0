@@ -83,7 +83,7 @@ NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "neo4j")
 driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 # Structured & Standard LLM instances via Groq
-groq_api_key = os.getenv("GROQ_API_KEY_3")
+groq_api_key = os.getenv("GROQ_API_KEY")
 base_llm = ChatGroq(
     model="openai/gpt-oss-120b",
     api_key=groq_api_key,
